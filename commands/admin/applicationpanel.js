@@ -3,8 +3,7 @@ const {
     PermissionFlagsBits,
     EmbedBuilder,
     ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
+    StringSelectMenuBuilder
 } = require('discord.js');
 const { pool } = require('../../database');
 
@@ -20,7 +19,7 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        const [rows] = await pool.query(
+        const [settingsRows] = await pool.query(
             `SELECT panel_channel_id
              FROM application_settings
              WHERE guild_id = ?
@@ -28,10 +27,25 @@ module.exports = {
             [interaction.guild.id]
         );
 
-        const settings = rows[0];
+        const settings = settingsRows[0];
         if (!settings?.panel_channel_id) {
             return interaction.reply({
                 content: '❌ Applications are not configured yet. Use `/applicationconfig` first.',
+                ephemeral: true
+            });
+        }
+
+        const [positions] = await pool.query(
+            `SELECT id, name
+             FROM application_positions
+             WHERE guild_id = ? AND enabled = 1
+             ORDER BY id ASC`,
+            [interaction.guild.id]
+        );
+
+        if (!positions.length) {
+            return interaction.reply({
+                content: '❌ No enabled application positions found. Use `/applicationposition add` first.',
                 ephemeral: true
             });
         }
@@ -54,21 +68,27 @@ module.exports = {
             })
             .setColor('#00bfff')
             .setDescription(
-                'Want to apply?\n\n' +
-                'Click the button below to submit your application.\n' +
+                'Want to apply for a role?\n\n' +
+                'Choose a position from the dropdown below and submit your application.\n' +
                 'Make sure your answers are honest, detailed, and thoughtful.\n\n' +
                 'A staff member will review it as soon as possible.'
             )
             .setFooter({ text: 'Infinity Applications' })
             .setTimestamp();
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('application_create')
-                .setLabel('Apply Now')
-                .setEmoji('📝')
-                .setStyle(ButtonStyle.Primary)
-        );
+        const select = new StringSelectMenuBuilder()
+            .setCustomId('application_position_select')
+            .setPlaceholder('Select a position to apply for')
+            .addOptions(
+                positions.slice(0, 25).map(position => ({
+                    label: position.name.slice(0, 100),
+                    value: String(position.id),
+                    description: `Apply for ${position.name}`.slice(0, 100),
+                    emoji: '📝'
+                }))
+            );
+
+        const row = new ActionRowBuilder().addComponents(select);
 
         await panelChannel.send({
             embeds: [embed],

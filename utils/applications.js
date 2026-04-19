@@ -9,13 +9,84 @@ const {
 } = require('discord.js');
 const { pool } = require('../database');
 
+function formatCooldown(ms) {
+    const totalSeconds = Math.ceil(ms / 1000);
+
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts = [];
+
+    if (days) parts.push(`${days}d`);
+    if (hours) parts.push(`${hours}h`);
+    if (minutes) parts.push(`${minutes}m`);
+    if (!days && !hours && !minutes) parts.push(`${seconds}s`);
+
+    return parts.join(' ');
+}
+
+async function getLatestApplication(guildId, userId) {
+    const [rows] = await pool.query(
+        `SELECT id, status, submitted_at
+         FROM applications
+         WHERE guild_id = ? AND user_id = ?
+         ORDER BY submitted_at DESC
+         LIMIT 1`,
+        [guildId, userId]
+    );
+
+    return rows[0] || null;
+}
+
 async function getApplicationSettings(guildId) {
     const [rows] = await pool.query(
-        `SELECT panel_channel_id, review_channel_id, accepted_role_id
+        `SELECT panel_channel_id, review_channel_id, application_cooldown_hours
          FROM application_settings
          WHERE guild_id = ?
          LIMIT 1`,
         [guildId]
+    );
+
+    return rows[0] || null;
+}
+
+async function checkApplicationCooldown(guildId, userId) {
+    const settings = await getApplicationSettings(guildId);
+    const cooldownHours = settings?.application_cooldown_hours ?? 24;
+
+    if (cooldownHours <= 0) {
+        return null;
+    }
+
+    const latestApplication = await getLatestApplication(guildId, userId);
+    if (!latestApplication) {
+        return null;
+    }
+
+    const cooldownMs = cooldownHours * 60 * 60 * 1000;
+    const expiresAt = Number(latestApplication.submitted_at) + cooldownMs;
+    const remainingMs = expiresAt - Date.now();
+
+    if (remainingMs > 0) {
+        return {
+            remainingMs,
+            remainingText: formatCooldown(remainingMs),
+            expiresAt
+        };
+    }
+
+    return null;
+}
+
+async function getApplicationPosition(guildId, positionId) {
+    const [rows] = await pool.query(
+        `SELECT *
+         FROM application_positions
+         WHERE guild_id = ? AND id = ? AND enabled = 1
+         LIMIT 1`,
+        [guildId, positionId]
     );
 
     return rows[0] || null;
@@ -36,12 +107,21 @@ function buildApplicationButtons(applicationId) {
     );
 }
 
-async function handleCreateApplication(interaction) {
+async function handleCreateApplication(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
         return interaction.reply({
             content: '❌ The applications system is not configured yet.',
+            ephemeral: true
+        });
+    }
+
+    const position = await getApplicationPosition(interaction.guild.id, positionId);
+
+    if (!position) {
+        return interaction.reply({
+            content: '❌ That application position could not be found or is disabled.',
             ephemeral: true
         });
     }
@@ -61,9 +141,21 @@ async function handleCreateApplication(interaction) {
         });
     }
 
+    const cooldown = await checkApplicationCooldown(interaction.guild.id, interaction.user.id);
+
+    if (cooldown) {
+        return interaction.reply({
+            content:
+                `❌ You are on application cooldown.\n` +
+                `You can apply again in **${cooldown.remainingText}**.\n` +
+                `Cooldown ends: <t:${Math.floor(cooldown.expiresAt / 1000)}:R>`,
+            ephemeral: true
+        });
+    }
+
     const modal = new ModalBuilder()
-        .setCustomId('application_modal')
-        .setTitle('Submit Application');
+        .setCustomId(`application_modal_${position.id}`)
+        .setTitle(`Apply for ${position.name}`.slice(0, 45));
 
     const q1 = new TextInputBuilder()
         .setCustomId('age')
@@ -81,7 +173,7 @@ async function handleCreateApplication(interaction) {
 
     const q3 = new TextInputBuilder()
         .setCustomId('why')
-        .setLabel('Why do you want this position?')
+        .setLabel(`Why do you want ${position.name}?`.slice(0, 45))
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
         .setMaxLength(1000);
@@ -111,12 +203,21 @@ async function handleCreateApplication(interaction) {
     return interaction.showModal(modal);
 }
 
-async function handleApplicationModal(interaction) {
+async function handleApplicationModal(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
         return interaction.reply({
             content: '❌ The applications system is not configured yet.',
+            ephemeral: true
+        });
+    }
+
+    const position = await getApplicationPosition(interaction.guild.id, positionId);
+
+    if (!position) {
+        return interaction.reply({
+            content: '❌ That application position could not be found or is disabled.',
             ephemeral: true
         });
     }
@@ -137,6 +238,17 @@ async function handleApplicationModal(interaction) {
         });
     }
 
+    const cooldown = await checkApplicationCooldown(interaction.guild.id, interaction.user.id);
+
+    if (cooldown) {
+        return interaction.editReply({
+            content:
+                `❌ You are on application cooldown.\n` +
+                `You can apply again in **${cooldown.remainingText}**.\n` +
+                `Cooldown ends: <t:${Math.floor(cooldown.expiresAt / 1000)}:R>`
+        });
+    }
+
     const answers = {
         age: interaction.fields.getTextInputValue('age'),
         experience: interaction.fields.getTextInputValue('experience'),
@@ -147,11 +259,13 @@ async function handleApplicationModal(interaction) {
 
     const [insertResult] = await pool.query(
         `INSERT INTO applications
-            (guild_id, user_id, status, answers_json, submitted_at)
-         VALUES (?, ?, 'pending', ?, ?)`,
+            (guild_id, user_id, position_id, position_name, status, answers_json, submitted_at)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
         [
             interaction.guild.id,
             interaction.user.id,
+            position.id,
+            position.name,
             JSON.stringify(answers),
             Date.now()
         ]
@@ -185,6 +299,11 @@ async function handleApplicationModal(interaction) {
             {
                 name: '🆔 Application ID',
                 value: `#${applicationId}`,
+                inline: true
+            },
+            {
+                name: '🎯 Position',
+                value: position.name,
                 inline: true
             },
             {
@@ -227,7 +346,7 @@ async function handleApplicationModal(interaction) {
     });
 
     return interaction.editReply({
-        content: '✅ Your application has been submitted successfully.'
+        content: `✅ Your application for **${position.name}** has been submitted successfully.`
     });
 }
 
@@ -274,11 +393,19 @@ async function handleAcceptApplication(interaction, applicationId) {
         [Date.now(), interaction.user.id, application.id]
     );
 
-    const settings = await getApplicationSettings(interaction.guild.id);
+    const [positionRows] = await pool.query(
+        `SELECT *
+         FROM application_positions
+         WHERE guild_id = ? AND id = ?
+         LIMIT 1`,
+        [interaction.guild.id, application.position_id]
+    );
+
+    const position = positionRows[0] || null;
     const member = await interaction.guild.members.fetch(application.user_id).catch(() => null);
 
-    if (member && settings?.accepted_role_id) {
-        const role = interaction.guild.roles.cache.get(settings.accepted_role_id);
+    if (member && position?.role_id) {
+        const role = interaction.guild.roles.cache.get(position.role_id);
         if (role) {
             await member.roles.add(role).catch(() => null);
         }
@@ -294,7 +421,7 @@ async function handleAcceptApplication(interaction, applicationId) {
             })
             .setColor('#00ff88')
             .setDescription(
-                `Congratulations! Your application for **${interaction.guild.name}** has been accepted.`
+                `Congratulations! Your application for **${application.position_name || 'this position'}** in **${interaction.guild.name}** has been accepted.`
             )
             .setFooter({ text: 'Infinity Applications' })
             .setTimestamp();
@@ -308,7 +435,9 @@ async function handleAcceptApplication(interaction, applicationId) {
             iconURL: interaction.user.displayAvatarURL({ dynamic: true })
         })
         .setColor('#00ff88')
-        .setDescription(`${interaction.user} accepted this application.`)
+        .setDescription(
+            `${interaction.user} accepted this application for **${application.position_name || 'Unknown Position'}**.`
+        )
         .setFooter({ text: 'Infinity Applications' })
         .setTimestamp();
 
@@ -396,6 +525,9 @@ async function handleDenyApplicationModal(interaction, applicationId) {
                 iconURL: interaction.guild.iconURL({ dynamic: true }) || undefined
             })
             .setColor('#ff4d4d')
+            .setDescription(
+                `Your application for **${application.position_name || 'this position'}** was denied.`
+            )
             .addFields(
                 {
                     name: '📄 Reason',
@@ -422,6 +554,11 @@ async function handleDenyApplicationModal(interaction, applicationId) {
                 inline: true
             },
             {
+                name: '🎯 Position',
+                value: application.position_name || 'Unknown Position',
+                inline: true
+            },
+            {
                 name: 'Reason',
                 value: `> ${reason}`,
                 inline: false
@@ -430,7 +567,6 @@ async function handleDenyApplicationModal(interaction, applicationId) {
         .setFooter({ text: 'Infinity Applications' })
         .setTimestamp();
 
-    await interaction.channel.messages.fetch(interaction.message.id).catch(() => null);
     await interaction.message.edit({
         embeds: [interaction.message.embeds[0], resultEmbed],
         components: []

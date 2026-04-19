@@ -486,10 +486,6 @@ module.exports = {
                 });
             }
 
-            if (interaction.customId === 'application_create') {
-                return handleCreateApplication(interaction);
-            }
-
             if (interaction.customId.startsWith('application_accept_')) {
                 const applicationId = interaction.customId.split('_')[2];
                 return handleAcceptApplication(interaction, applicationId);
@@ -505,8 +501,9 @@ module.exports = {
 
         // ===== MODALS =====
         if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'application_modal') {
-                return handleApplicationModal(interaction);
+            if (interaction.customId.startsWith('application_modal_')) {
+                const positionId = interaction.customId.split('_')[2];
+                return handleApplicationModal(interaction, positionId);
             }
 
             if (interaction.customId.startsWith('application_deny_modal_')) {
@@ -679,6 +676,11 @@ module.exports = {
                     embeds: [embed],
                     components: [menu]
                 });
+            }
+
+            if (interaction.customId === 'application_position_select') {
+                const positionId = interaction.values[0];
+                return handleCreateApplication(interaction, positionId);
             }
 
             if (interaction.customId.startsWith('automod_select_')) {

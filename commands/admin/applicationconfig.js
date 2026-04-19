@@ -9,7 +9,7 @@ const { pool } = require('../../database');
 module.exports = {
     name: 'applicationconfig',
     description: 'Configure the applications system.',
-    usage: '/applicationconfig panel:<channel> review:<channel> acceptedrole:<role>',
+    usage: '/applicationconfig panel:<channel> review:<channel> cooldown:<hours>',
     userPermissions: PermissionFlagsBits.Administrator,
 
     slashData: new SlashCommandBuilder()
@@ -29,10 +29,11 @@ module.exports = {
                 .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                 .setRequired(true)
         )
-        .addRoleOption(option =>
+        .addIntegerOption(option =>
             option
-                .setName('acceptedrole')
-                .setDescription('Role to give users when accepted')
+                .setName('cooldown')
+                .setDescription('Cooldown in hours before a user can apply again')
+                .setMinValue(0)
                 .setRequired(false)
         )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -40,22 +41,22 @@ module.exports = {
     async executeSlash(interaction) {
         const panel = interaction.options.getChannel('panel', true);
         const review = interaction.options.getChannel('review', true);
-        const acceptedRole = interaction.options.getRole('acceptedrole');
+        const cooldown = interaction.options.getInteger('cooldown') ?? 24;
 
         await pool.query(
             `INSERT INTO application_settings
-                (guild_id, panel_channel_id, review_channel_id, accepted_role_id, updated_at)
+                (guild_id, panel_channel_id, review_channel_id, application_cooldown_hours, updated_at)
              VALUES (?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 panel_channel_id = VALUES(panel_channel_id),
                 review_channel_id = VALUES(review_channel_id),
-                accepted_role_id = VALUES(accepted_role_id),
+                application_cooldown_hours = VALUES(application_cooldown_hours),
                 updated_at = VALUES(updated_at)`,
             [
                 interaction.guild.id,
                 panel.id,
                 review.id,
-                acceptedRole?.id || null,
+                cooldown,
                 Date.now()
             ]
         );
@@ -78,8 +79,8 @@ module.exports = {
                     inline: true
                 },
                 {
-                    name: '🏷️ Accepted Role',
-                    value: acceptedRole ? `<@&${acceptedRole.id}>` : 'Not set',
+                    name: '⏳ Cooldown',
+                    value: `\`${cooldown} hour(s)\``,
                     inline: true
                 }
             )
