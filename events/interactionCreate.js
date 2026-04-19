@@ -33,6 +33,14 @@ const {
     handleDenyApplicationModal
 } = require('../utils/applications');
 
+const {
+    handleClaimReport,
+    handleResolveReport,
+    handleDismissReport,
+    handleResolveReportModal,
+    handleDismissReportModal
+} = require('../utils/reports');
+
 // ===== PING HELPERS =====
 function getPingStatus(ping) {
     if (ping < 120) return { text: 'Excellent', emoji: '🟢' };
@@ -321,6 +329,21 @@ module.exports = {
 
         // ===== BUTTONS =====
         if (interaction.isButton()) {
+            if (interaction.customId.startsWith('report_claim_')) {
+                const reportId = interaction.customId.split('_')[2];
+                return handleClaimReport(interaction, reportId);
+            }
+
+            if (interaction.customId.startsWith('report_resolve_')) {
+                const reportId = interaction.customId.split('_')[2];
+                return handleResolveReport(interaction, reportId);
+            }
+
+            if (interaction.customId.startsWith('report_dismiss_')) {
+                const reportId = interaction.customId.split('_')[2];
+                return handleDismissReport(interaction, reportId);
+            }
+
             if (interaction.customId === 'giveaway_enter') {
                 return handleGiveawayEnter(interaction);
             }
@@ -501,6 +524,16 @@ module.exports = {
 
         // ===== MODALS =====
         if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith('report_resolve_modal_')) {
+                const reportId = interaction.customId.split('_')[3];
+                return handleResolveReportModal(interaction, reportId);
+            }
+
+            if (interaction.customId.startsWith('report_dismiss_modal_')) {
+                const reportId = interaction.customId.split('_')[3];
+                return handleDismissReportModal(interaction, reportId);
+            }
+
             if (interaction.customId.startsWith('application_modal_')) {
                 const positionId = interaction.customId.split('_')[2];
                 return handleApplicationModal(interaction, positionId);
