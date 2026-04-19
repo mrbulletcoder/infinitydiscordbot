@@ -1,12 +1,18 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { pool } = require('../../database');
 const logAction = require('../../utils/logAction');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
+const { insertWarning } = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'warn',
     description: 'Issue a warning to a user.',
     usage: '!warn @user [reason]',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('warn')
@@ -25,33 +31,33 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executePrefix(message, args) {
+        const targetMember = message.mentions.members.first();
         const targetUser = message.mentions.users.first();
-        if (!targetUser) {
-            return message.reply('❌ Mention a user.');
-        }
 
-        if (targetUser.id === message.author.id) {
-            return message.reply('❌ You cannot warn yourself.');
+        if (!targetUser || !targetMember) {
+            return message.reply('❌ Mention a user.');
         }
 
         if (targetUser.bot) {
             return message.reply('❌ You cannot warn bots.');
         }
 
+        if (!(await checkPrefixHierarchy(message, targetMember))) return;
+
         const reason = args.slice(1).join(' ') || 'No reason provided';
         const timestamp = Math.floor(Date.now() / 1000);
 
-        await pool.query(
-            `INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at)
-             VALUES (?, ?, ?, ?, ?)`,
-            [
-                message.guild.id,
-                targetUser.id,
-                message.author.id,
-                reason,
-                timestamp
-            ]
-        );
+        const result = await insertWarning({
+            guildId: message.guild.id,
+            userId: targetUser.id,
+            moderatorId: message.author.id,
+            reason,
+            createdAt: timestamp
+        });
+
+        if (!result.ok) {
+            return message.reply('❌ Failed to save warning.');
+        }
 
         await logAction({
             client: message.client,
@@ -95,11 +101,12 @@ module.exports = {
 
     async executeSlash(interaction) {
         const targetUser = interaction.options.getUser('user', true);
+        const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        if (targetUser.id === interaction.user.id) {
+        if (!targetMember) {
             return interaction.reply({
-                content: '❌ You cannot warn yourself.',
+                content: '❌ User not found in this server.',
                 ephemeral: true
             });
         }
@@ -111,19 +118,24 @@ module.exports = {
             });
         }
 
+        if (!(await checkSlashHierarchy(interaction, targetMember))) return;
+
         const timestamp = Math.floor(Date.now() / 1000);
 
-        await pool.query(
-            `INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at)
-             VALUES (?, ?, ?, ?, ?)`,
-            [
-                interaction.guild.id,
-                targetUser.id,
-                interaction.user.id,
-                reason,
-                timestamp
-            ]
-        );
+        const result = await insertWarning({
+            guildId: interaction.guild.id,
+            userId: targetUser.id,
+            moderatorId: interaction.user.id,
+            reason,
+            createdAt: timestamp
+        });
+
+        if (!result.ok) {
+            return interaction.reply({
+                content: '❌ Failed to save warning.',
+                ephemeral: true
+            });
+        }
 
         await logAction({
             client: interaction.client,

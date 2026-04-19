@@ -256,6 +256,7 @@ module.exports = {
     description: 'Report a member to server staff.',
     usage: '!report @user <reason> / /report <user> <reason>',
     category: 'general',
+    cooldown: 10,
 
     slashData: new SlashCommandBuilder()
         .setName('report')
@@ -276,6 +277,14 @@ module.exports = {
 
     async executePrefix(message, args) {
         const targetUser = message.mentions.users.first();
+
+        if (targetUser.id === message.author.id) {
+            return message.reply('❌ You cannot report yourself.');
+        }
+
+        if (targetUser.bot) {
+            return message.reply('❌ You cannot report bots.');
+        }
 
         if (!targetUser) {
             return message.reply('❌ Please mention a user to report.');

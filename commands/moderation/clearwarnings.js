@@ -1,11 +1,17 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { pool } = require('../../database');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
+const { clearWarnings } = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'clearwarnings',
     description: 'Clear all warnings for a user.',
     usage: '!clearwarnings @user / /clearwarnings <user>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('clearwarnings')
@@ -15,16 +21,23 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executePrefix(message) {
+        const targetMember = message.mentions.members.first();
         const targetUser = message.mentions.users.first();
-        if (!targetUser) {
+
+        if (!targetUser || !targetMember) {
             return message.reply('❌ Mention a user.');
         }
 
-        await pool.query(
-            `DELETE FROM warnings
-             WHERE guild_id = ? AND user_id = ?`,
-            [message.guild.id, targetUser.id]
-        );
+        if (targetUser.bot) {
+            return message.reply('❌ You cannot clear warnings for bots.');
+        }
+
+        if (!(await checkPrefixHierarchy(message, targetMember))) return;
+
+        const result = await clearWarnings(message.guild.id, targetUser.id);
+        if (!result.ok) {
+            return message.reply('❌ Failed to clear warnings.');
+        }
 
         const embed = new EmbedBuilder()
             .setAuthor({
@@ -53,12 +66,31 @@ module.exports = {
 
     async executeSlash(interaction) {
         const targetUser = interaction.options.getUser('user', true);
+        const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        await pool.query(
-            `DELETE FROM warnings
-             WHERE guild_id = ? AND user_id = ?`,
-            [interaction.guild.id, targetUser.id]
-        );
+        if (!targetMember) {
+            return interaction.reply({
+                content: '❌ User not found in this server.',
+                ephemeral: true
+            });
+        }
+
+        if (targetUser.bot) {
+            return interaction.reply({
+                content: '❌ You cannot clear warnings for bots.',
+                ephemeral: true
+            });
+        }
+
+        if (!(await checkSlashHierarchy(interaction, targetMember))) return;
+
+        const result = await clearWarnings(interaction.guild.id, targetUser.id);
+        if (!result.ok) {
+            return interaction.reply({
+                content: '❌ Failed to clear warnings.',
+                ephemeral: true
+            });
+        }
 
         const embed = new EmbedBuilder()
             .setAuthor({

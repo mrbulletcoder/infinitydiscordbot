@@ -10,7 +10,9 @@ module.exports = {
     name: 'unban',
     description: 'Unban a user and allow them to rejoin the server.',
     usage: '!unban <userID> [reason]',
-    userPermissions: PermissionFlagsBits.BanMembers,
+    userPermissions: [PermissionFlagsBits.BanMembers],
+    botPermissions: [PermissionFlagsBits.BanMembers, PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('unban')
@@ -72,9 +74,10 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Ban System' })
                 .setTimestamp();
 
-            message.reply({ embeds: [embed] });
-        } catch {
-            message.reply('❌ Failed to unban user.');
+            return message.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Unban Command Error:', error);
+            return message.reply('❌ Failed to unban user.');
         }
     },
 
@@ -126,11 +129,11 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Ban System' })
                 .setTimestamp();
 
-            interaction.editReply({ embeds: [embed] });
-        } catch {
-            interaction.editReply({
-                content: '❌ Failed to unban user.',
-                ephemeral: true
+            return interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Unban Command Error:', error);
+            return interaction.editReply({
+                content: '❌ Failed to unban user.'
             });
         }
     }

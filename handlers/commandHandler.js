@@ -28,9 +28,19 @@ module.exports = async (client) => {
     const commands = [];
     const categoryCounts = {};
     let totalFiles = 0;
+    let loadedCommands = 0;
+    let skippedCommands = 0;
 
     const commandsPath = path.join(__dirname, '..', 'commands');
-    const commandFolders = fs.readdirSync(commandsPath);
+
+    if (!fs.existsSync(commandsPath)) {
+        throw new Error(`Commands folder not found: ${commandsPath}`);
+    }
+
+    const commandFolders = fs.readdirSync(commandsPath).filter((entry) => {
+        const fullPath = path.join(commandsPath, entry);
+        return fs.statSync(fullPath).isDirectory();
+    });
 
     console.log('');
     await cinematicLoader(colors, color, sleep, 'Scanning command folders');
@@ -44,17 +54,55 @@ module.exports = async (client) => {
         categoryCounts[folder] = 0;
 
         for (const file of commandFiles) {
-            const command = require(`../commands/${folder}/${file}`);
-
-            command.category = command.category || folder;
-            client.commands.set(command.name, command);
-
             totalFiles++;
-            categoryCounts[folder]++;
 
-            const slashBuilder = command.data || command.slashData;
-            if (slashBuilder) {
-                commands.push(slashBuilder.toJSON());
+            try {
+                const command = require(`../commands/${folder}/${file}`);
+
+                if (!command || typeof command !== 'object') {
+                    console.warn(`⚠️ Skipping invalid command file: commands/${folder}/${file}`);
+                    skippedCommands++;
+                    continue;
+                }
+
+                if (!command.name || typeof command.name !== 'string') {
+                    console.warn(`⚠️ Command file missing valid "name": commands/${folder}/${file}`);
+                    skippedCommands++;
+                    continue;
+                }
+
+                const hasSlash = command.data || command.slashData;
+                const hasPrefix = typeof command.executePrefix === 'function';
+                const hasSlashExecute = typeof command.executeSlash === 'function';
+
+                if (!hasPrefix && !hasSlashExecute) {
+                    console.warn(`⚠️ Command "${command.name}" has no executePrefix() or executeSlash(): commands/${folder}/${file}`);
+                    skippedCommands++;
+                    continue;
+                }
+
+                if (client.commands.has(command.name)) {
+                    console.warn(`⚠️ Duplicate command name "${command.name}" found in commands/${folder}/${file}. Skipping duplicate.`);
+                    skippedCommands++;
+                    continue;
+                }
+
+                command.category = command.category || folder;
+                client.commands.set(command.name, command);
+
+                loadedCommands++;
+                categoryCounts[folder]++;
+
+                if (hasSlash) {
+                    try {
+                        commands.push(hasSlash.toJSON());
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to convert slash data for "${command.name}" in commands/${folder}/${file}:`, error);
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ Failed to load command file "commands/${folder}/${file}":`, error);
+                skippedCommands++;
             }
         }
     }
@@ -68,6 +116,8 @@ module.exports = async (client) => {
     console.log('');
 
     printStatLine(colors, color, 'Files', String(totalFiles), 14);
+    printStatLine(colors, color, 'Loaded', String(loadedCommands), 14);
+    printStatLine(colors, color, 'Skipped', String(skippedCommands), 14);
     printStatLine(colors, color, 'Slash', String(commands.length), 14);
     printStatLine(colors, color, 'Categories', String(commandFolders.length), 14);
 
@@ -80,6 +130,14 @@ module.exports = async (client) => {
     }
 
     console.log('');
+
+    if (!process.env.DISCORD_TOKEN) {
+        throw new Error('Missing DISCORD_TOKEN in .env');
+    }
+
+    if (!process.env.CLIENT_ID) {
+        throw new Error('Missing CLIENT_ID in .env');
+    }
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -104,6 +162,8 @@ module.exports = async (client) => {
         console.log(color(colors.gray, '────────────────────────────────────────────────────────────'));
         console.error(error);
         console.log('');
+
+        throw error;
     }
 };
 

@@ -18,6 +18,7 @@ async function testConnection() {
         connection.release();
     } catch (error) {
         console.error('❌ MySQL connection failed:', error);
+        throw error;
     }
 }
 

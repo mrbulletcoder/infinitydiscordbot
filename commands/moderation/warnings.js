@@ -1,11 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { pool } = require('../../database');
+const { getWarnings } = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'warnings',
     description: 'View all warnings issued to a user.',
     usage: '!warnings @user / /warnings <user>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('warnings')
@@ -24,13 +26,12 @@ module.exports = {
             return message.reply('❌ Mention a user.');
         }
 
-        const [rows] = await pool.query(
-            `SELECT reason, moderator_id, created_at
-             FROM warnings
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY id ASC`,
-            [message.guild.id, targetUser.id]
-        );
+        const result = await getWarnings(message.guild.id, targetUser.id);
+        if (!result.ok) {
+            return message.reply('❌ Failed to fetch warnings.');
+        }
+
+        const rows = result.rows;
 
         const lines = await Promise.all(
             rows.map(async (warning, index) => {
@@ -59,13 +60,15 @@ module.exports = {
     async executeSlash(interaction) {
         const targetUser = interaction.options.getUser('user', true);
 
-        const [rows] = await pool.query(
-            `SELECT reason, moderator_id, created_at
-             FROM warnings
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY id ASC`,
-            [interaction.guild.id, targetUser.id]
-        );
+        const result = await getWarnings(interaction.guild.id, targetUser.id);
+        if (!result.ok) {
+            return interaction.reply({
+                content: '❌ Failed to fetch warnings.',
+                ephemeral: true
+            });
+        }
+
+        const rows = result.rows;
 
         const lines = await Promise.all(
             rows.map(async (warning, index) => {

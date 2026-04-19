@@ -4,13 +4,15 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 
-const { pool } = require('../../database');
+const { getCasesForUser } = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'cases',
     description: 'View a list of moderation cases for a user.',
     usage: '!cases @user / /cases <user>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('cases')
@@ -28,14 +30,12 @@ module.exports = {
             return message.reply('❌ Mention a user.');
         }
 
-        const [rows] = await pool.query(
-            `SELECT case_number, action, created_at
-             FROM cases
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY case_number DESC
-             LIMIT 10`,
-            [message.guild.id, targetUser.id]
-        );
+        const result = await getCasesForUser(message.guild.id, targetUser.id, 10);
+        if (!result.ok) {
+            return message.reply('❌ Failed to fetch case history.');
+        }
+
+        const rows = result.rows;
 
         if (!rows.length) {
             return message.reply('❌ No case history found for that user.');
@@ -62,14 +62,15 @@ module.exports = {
     async executeSlash(interaction) {
         const targetUser = interaction.options.getUser('user', true);
 
-        const [rows] = await pool.query(
-            `SELECT case_number, action, created_at
-             FROM cases
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY case_number DESC
-             LIMIT 10`,
-            [interaction.guild.id, targetUser.id]
-        );
+        const result = await getCasesForUser(interaction.guild.id, targetUser.id, 10);
+        if (!result.ok) {
+            return interaction.reply({
+                content: '❌ Failed to fetch case history.',
+                ephemeral: true
+            });
+        }
+
+        const rows = result.rows;
 
         if (!rows.length) {
             return interaction.reply({

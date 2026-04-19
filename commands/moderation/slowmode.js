@@ -4,7 +4,13 @@ module.exports = {
     name: 'slowmode',
     description: 'Set the slowmode delay for the current channel.',
     usage: '!slowmode <seconds> / /slowmode <seconds>',
-    userPermissions: PermissionFlagsBits.ManageChannels,
+    userPermissions: [PermissionFlagsBits.ManageChannels],
+    botPermissions: [
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('slowmode')
@@ -16,35 +22,42 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async executePrefix(message, args) {
-        const seconds = parseInt(args[0]);
+        const seconds = parseInt(args[0], 10);
         if (isNaN(seconds) || seconds < 0 || seconds > 21600) {
             return message.reply('❌ Provide a number between 0 and 21600.');
         }
 
-        await message.channel.setRateLimitPerUser(seconds);
+        try {
+            await message.channel.setRateLimitPerUser(seconds);
 
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: '🐢 Slowmode Updated' })
-            .setColor('#ffaa00')
-            .addFields(
-                {
-                    name: '⏱️ Delay',
-                    value: `**${seconds}s**`,
-                    inline: true
-                },
-                {
-                    name: '📍 Channel',
-                    value: `${message.channel}`,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${message.author.tag}\n\`${message.author.id}\``,
-                    inline: true
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Channel Control' })
-            .setTimestamp();
+            const embed = new EmbedBuilder()
+                .setAuthor({ name: '🐢 Slowmode Updated' })
+                .setColor('#ffaa00')
+                .addFields(
+                    {
+                        name: '⏱️ Delay',
+                        value: `**${seconds}s**`,
+                        inline: true
+                    },
+                    {
+                        name: '📍 Channel',
+                        value: `${message.channel}`,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${message.author.tag}\n\`${message.author.id}\``,
+                        inline: true
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Channel Control' })
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Slowmode Command Error:', error);
+            return message.reply('❌ Failed to update slowmode.');
+        }
     },
 
     async executeSlash(interaction) {
@@ -54,31 +67,36 @@ module.exports = {
             return interaction.reply({ content: '❌ Provide a number between 0 and 21600.', ephemeral: true });
         }
 
-        await interaction.channel.setRateLimitPerUser(seconds);
+        try {
+            await interaction.channel.setRateLimitPerUser(seconds);
 
-        const embed = new EmbedBuilder()
-            .setAuthor({ name: '🐢 Slowmode Updated' })
-            .setColor('#ffaa00')
-            .addFields(
-                {
-                    name: '⏱️ Delay',
-                    value: `**${seconds}s**`,
-                    inline: true
-                },
-                {
-                    name: '📍 Channel',
-                    value: `${interaction.channel}`,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Channel Control' })
-            .setTimestamp();
+            const embed = new EmbedBuilder()
+                .setAuthor({ name: '🐢 Slowmode Updated' })
+                .setColor('#ffaa00')
+                .addFields(
+                    {
+                        name: '⏱️ Delay',
+                        value: `**${seconds}s**`,
+                        inline: true
+                    },
+                    {
+                        name: '📍 Channel',
+                        value: `${interaction.channel}`,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                        inline: true
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Channel Control' })
+                .setTimestamp();
 
-        interaction.reply({ embeds: [embed] });
+            return interaction.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Slowmode Command Error:', error);
+            return interaction.reply({ content: '❌ Failed to update slowmode.', ephemeral: true });
+        }
     }
 };

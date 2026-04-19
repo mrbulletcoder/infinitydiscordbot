@@ -12,6 +12,13 @@ module.exports = {
     description: 'Unlock a channel',
     usage: '!unlock [channel] [reason]',
     category: 'moderation',
+    userPermissions: [PermissionFlagsBits.ManageChannels],
+    botPermissions: [
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     data: new SlashCommandBuilder()
         .setName('unlock')
@@ -35,10 +42,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async executePrefix(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-            return message.reply('❌ You need **Manage Channels** permission.');
-        }
-
         const mentionedChannel = message.mentions.channels.first();
         const channel = mentionedChannel || message.channel;
 
@@ -74,26 +77,18 @@ module.exports = {
 async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }) {
     try {
         if (!channel || !channel.permissionOverwrites) {
-            if (isSlash) {
-                return ctx.reply({
-                    content: '❌ That channel cannot be unlocked.',
-                    ephemeral: true
-                });
-            }
-            return ctx.reply('❌ That channel cannot be unlocked.');
+            return isSlash
+                ? ctx.reply({ content: '❌ That channel cannot be unlocked.', ephemeral: true })
+                : ctx.reply('❌ That channel cannot be unlocked.');
         }
 
         const everyoneOverwrite = channel.permissionOverwrites.cache.get(guild.roles.everyone.id);
         const alreadyUnlocked = !everyoneOverwrite?.deny?.has(PermissionFlagsBits.SendMessages);
 
         if (alreadyUnlocked) {
-            if (isSlash) {
-                return ctx.reply({
-                    content: '❌ That channel is already unlocked.',
-                    ephemeral: true
-                });
-            }
-            return ctx.reply('❌ That channel is already unlocked.');
+            return isSlash
+                ? ctx.reply({ content: '❌ That channel is already unlocked.', ephemeral: true })
+                : ctx.reply('❌ That channel is already unlocked.');
         }
 
         await channel.permissionOverwrites.edit(guild.roles.everyone, {
@@ -143,15 +138,15 @@ async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }
                 return ctx.followUp({
                     content: '❌ Failed to unlock channel.',
                     ephemeral: true
-                }).catch(() => { });
+                }).catch(() => null);
             }
 
             return ctx.reply({
                 content: '❌ Failed to unlock channel.',
                 ephemeral: true
-            }).catch(() => { });
+            }).catch(() => null);
         }
 
-        return ctx.reply('❌ Failed to unlock channel.').catch(() => { });
+        return ctx.reply('❌ Failed to unlock channel.').catch(() => null);
     }
 }

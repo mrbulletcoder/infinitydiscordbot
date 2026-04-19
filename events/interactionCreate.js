@@ -41,6 +41,73 @@ const {
     handleDismissReportModal
 } = require('../utils/reports');
 
+// ===== SAFE REPLY HELPERS =====
+async function safeErrorReply(interaction, message = '❌ Something went wrong while handling that interaction.') {
+    try {
+        if (interaction.replied || interaction.deferred) {
+            return await interaction.followUp({
+                content: message,
+                ephemeral: true
+            });
+        }
+
+        return await interaction.reply({
+            content: message,
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Failed to send safe error reply:', error);
+    }
+}
+
+async function safeRun(interaction, label, fn) {
+    try {
+        return await fn();
+    } catch (error) {
+        console.error(`❌ Error in ${label}:`, error);
+        return safeErrorReply(interaction);
+    }
+}
+
+function getCommandCooldown(command) {
+    return Number(command.cooldown ?? 3);
+}
+
+async function handleCommandCooldown(interaction, command) {
+    if (!interaction.client.cooldowns) {
+        interaction.client.cooldowns = new Map();
+    }
+
+    const cooldowns = interaction.client.cooldowns;
+    const commandName = command.name || interaction.commandName;
+    const key = `${interaction.user.id}:${commandName}`;
+    const cooldownSeconds = getCommandCooldown(command);
+
+    if (cooldownSeconds <= 0) return false;
+
+    const now = Date.now();
+    const expiresAt = cooldowns.get(key);
+
+    if (expiresAt && now < expiresAt) {
+        const remaining = ((expiresAt - now) / 1000).toFixed(1);
+
+        await safeErrorReply(
+            interaction,
+            `⏳ Please wait **${remaining}s** before using \`/${commandName}\` again.`
+        );
+
+        return true;
+    }
+
+    cooldowns.set(key, now + cooldownSeconds * 1000);
+
+    setTimeout(() => {
+        cooldowns.delete(key);
+    }, cooldownSeconds * 1000);
+
+    return false;
+}
+
 // ===== PING HELPERS =====
 function getPingStatus(ping) {
     if (ping < 120) return { text: 'Excellent', emoji: '🟢' };
@@ -298,563 +365,623 @@ module.exports = {
     name: 'interactionCreate',
 
     async execute(interaction, client) {
-        // ===== SLASH COMMANDS =====
-        if (interaction.isChatInputCommand()) {
-            const command = client.commands.get(interaction.commandName);
-            if (!command) return;
+        try {
+            // ===== SLASH COMMANDS =====
+            if (interaction.isChatInputCommand()) {
+                const command = client.commands.get(interaction.commandName);
 
-            const allowed = await checkSlashPermission(interaction, command);
-            if (!allowed) return;
-
-            try {
-                await command.executeSlash(interaction);
-            } catch (error) {
-                console.error(error);
-
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({
-                        content: '❌ Error executing command.',
-                        ephemeral: true
-                    }).catch(() => { });
-                } else {
-                    await interaction.reply({
-                        content: '❌ Error executing command.',
-                        ephemeral: true
-                    }).catch(() => { });
+                if (!command) {
+                    return safeErrorReply(interaction, '❌ That command could not be found.');
                 }
-            }
 
-            return;
-        }
+                if (typeof command.executeSlash !== 'function') {
+                    console.error(`Command "${interaction.commandName}" is missing executeSlash().`);
+                    return safeErrorReply(interaction, '❌ That command is not set up correctly.');
+                }
 
-        // ===== BUTTONS =====
-        if (interaction.isButton()) {
-            if (interaction.customId.startsWith('report_claim_')) {
-                const reportId = interaction.customId.split('_')[2];
-                return handleClaimReport(interaction, reportId);
-            }
+                let allowed = false;
 
-            if (interaction.customId.startsWith('report_resolve_')) {
-                const reportId = interaction.customId.split('_')[2];
-                return handleResolveReport(interaction, reportId);
-            }
-
-            if (interaction.customId.startsWith('report_dismiss_')) {
-                const reportId = interaction.customId.split('_')[2];
-                return handleDismissReport(interaction, reportId);
-            }
-
-            if (interaction.customId === 'giveaway_enter') {
-                return handleGiveawayEnter(interaction);
-            }
-
-            if (interaction.customId === 'giveaway_entries') {
-                return handleGiveawayEntries(interaction);
-            }
-
-            if (interaction.customId === 'giveaway_end') {
-                return handleGiveawayEnd(interaction);
-            }
-
-            if (interaction.customId.startsWith('giveaway_confirm_end_')) {
-                const giveawayId = interaction.customId.replace('giveaway_confirm_end_', '');
-                return handleGiveawayConfirmEnd(interaction, giveawayId);
-            }
-
-            if (interaction.customId.startsWith('giveaway_cancel_end_')) {
-                return handleGiveawayCancelEnd(interaction);
-            }
-
-            if (interaction.customId === 'giveaway_reroll') {
-                return handleGiveawayReroll(interaction);
-            }
-
-            if (interaction.customId === 'refresh_ping') {
                 try {
-                    const start = Date.now();
-                    await interaction.deferUpdate();
-                    const end = Date.now();
-
-                    const apiLatency = end - start;
-                    const messageLatency = Date.now() - interaction.message.createdTimestamp;
-                    const rawWs = interaction.client.ws.ping;
-                    const wsPing = rawWs > 0 ? Math.round(rawWs) : null;
-
-                    const status = getPingStatus(apiLatency);
-                    const color = getPingColor(apiLatency);
-
-                    const embed = new EmbedBuilder()
-                        .setTitle('🏓 Infinity Performance')
-                        .setDescription('⚡ Real-time system performance tracking')
-                        .setColor(color)
-                        .addFields(
-                            {
-                                name: '⚡ API Latency',
-                                value: `\`${apiLatency}ms\`\n${createBar(apiLatency)}`,
-                                inline: true
-                            },
-                            {
-                                name: '📨 Response Time',
-                                value: `\`${messageLatency}ms\`\n${createBar(messageLatency)}`,
-                                inline: true
-                            },
-                            {
-                                name: '🌐 WebSocket',
-                                value: wsPing !== null
-                                    ? `\`${wsPing}ms\`\n${createBar(wsPing)}`
-                                    : '`Calculating...`',
-                                inline: true
-                            },
-                            {
-                                name: '📊 Status',
-                                value: `${status.emoji} **${status.text}**`,
-                                inline: false
-                            },
-                            {
-                                name: '⏱️ Uptime',
-                                value: `\`${formatUptime(interaction.client.uptime)}\``,
-                                inline: true
-                            },
-                            {
-                                name: '🧠 Memory',
-                                value: `\`${getMemoryUsage()}\``,
-                                inline: true
-                            }
-                        )
-                        .setFooter({ text: 'Infinity Bot • Real-time System Monitor ⚡' })
-                        .setTimestamp();
-
-                    const row = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('refresh_ping')
-                            .setLabel('🔄 Refresh')
-                            .setStyle(ButtonStyle.Primary)
-                    );
-
-                    await interaction.editReply({
-                        embeds: [embed],
-                        components: [row]
-                    });
+                    allowed = await checkSlashPermission(interaction, command);
                 } catch (error) {
-                    console.error('Error handling refresh_ping button:', error);
+                    console.error(`Permission check failed for /${interaction.commandName}:`, error);
+                    return safeErrorReply(interaction, '❌ Failed to check permissions for that command.');
+                }
+
+                if (!allowed) return;
+
+                const isCoolingDown = await handleCommandCooldown(interaction, command);
+                if (isCoolingDown) return;
+
+                return safeRun(
+                    interaction,
+                    `slash command /${interaction.commandName}`,
+                    () => command.executeSlash(interaction)
+                );
+            }
+
+            // ===== BUTTONS =====
+            if (interaction.isButton()) {
+                if (interaction.customId.startsWith('report_claim_')) {
+                    const reportId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleClaimReport(interaction, reportId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('report_resolve_')) {
+                    const reportId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleResolveReport(interaction, reportId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('report_dismiss_')) {
+                    const reportId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleDismissReport(interaction, reportId)
+                    );
+                }
+
+                if (interaction.customId === 'giveaway_enter') {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayEnter(interaction)
+                    );
+                }
+
+                if (interaction.customId === 'giveaway_entries') {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayEntries(interaction)
+                    );
+                }
+
+                if (interaction.customId === 'giveaway_end') {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayEnd(interaction)
+                    );
+                }
+
+                if (interaction.customId.startsWith('giveaway_confirm_end_')) {
+                    const giveawayId = interaction.customId.replace('giveaway_confirm_end_', '');
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayConfirmEnd(interaction, giveawayId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('giveaway_cancel_end_')) {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayCancelEnd(interaction)
+                    );
+                }
+
+                if (interaction.customId === 'giveaway_reroll') {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleGiveawayReroll(interaction)
+                    );
+                }
+
+                if (interaction.customId === 'refresh_ping') {
+                    return safeRun(interaction, 'button refresh_ping', async () => {
+                        const start = Date.now();
+                        await interaction.deferUpdate();
+                        const end = Date.now();
+
+                        const apiLatency = end - start;
+                        const messageLatency = Date.now() - interaction.message.createdTimestamp;
+                        const rawWs = interaction.client.ws.ping;
+                        const wsPing = rawWs > 0 ? Math.round(rawWs) : null;
+
+                        const status = getPingStatus(apiLatency);
+                        const color = getPingColor(apiLatency);
+
+                        const embed = new EmbedBuilder()
+                            .setTitle('🏓 Infinity Performance')
+                            .setDescription('⚡ Real-time system performance tracking')
+                            .setColor(color)
+                            .addFields(
+                                {
+                                    name: '⚡ API Latency',
+                                    value: `\`${apiLatency}ms\`\n${createBar(apiLatency)}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '📨 Response Time',
+                                    value: `\`${messageLatency}ms\`\n${createBar(messageLatency)}`,
+                                    inline: true
+                                },
+                                {
+                                    name: '🌐 WebSocket',
+                                    value: wsPing !== null
+                                        ? `\`${wsPing}ms\`\n${createBar(wsPing)}`
+                                        : '`Calculating...`',
+                                    inline: true
+                                },
+                                {
+                                    name: '📊 Status',
+                                    value: `${status.emoji} **${status.text}**`,
+                                    inline: false
+                                },
+                                {
+                                    name: '⏱️ Uptime',
+                                    value: `\`${formatUptime(interaction.client.uptime)}\``,
+                                    inline: true
+                                },
+                                {
+                                    name: '🧠 Memory',
+                                    value: `\`${getMemoryUsage()}\``,
+                                    inline: true
+                                }
+                            )
+                            .setFooter({ text: 'Infinity Bot • Real-time System Monitor ⚡' })
+                            .setTimestamp();
+
+                        const row = new ActionRowBuilder().addComponents(
+                            new ButtonBuilder()
+                                .setCustomId('refresh_ping')
+                                .setLabel('🔄 Refresh')
+                                .setStyle(ButtonStyle.Primary)
+                        );
+
+                        await interaction.editReply({
+                            embeds: [embed],
+                            components: [row]
+                        });
+                    });
+                }
+
+                if (interaction.customId === 'ticket_create') {
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleCreateTicket(interaction)
+                    );
+                }
+
+                if (interaction.customId.startsWith('ticket_claim_')) {
+                    const ticketId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleClaimTicket(interaction, ticketId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('ticket_close_confirm_')) {
+                    const ticketId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleCloseTicket(interaction, ticketId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('ticket_close_yes_')) {
+                    const ticketId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleCloseTicketConfirm(interaction, ticketId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('ticket_close_no_')) {
+                    const ticketId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleCloseTicketCancel(interaction, ticketId)
+                    );
+                }
+
+                if (
+                    interaction.customId === 'automod_add' ||
+                    interaction.customId === 'automod_edit' ||
+                    interaction.customId === 'automod_delete'
+                ) {
+                    const mode = interaction.customId.split('_')[1];
+
+                    const menu = new StringSelectMenuBuilder()
+                        .setCustomId(`automod_select_${mode}`)
+                        .setPlaceholder('Select a protection type')
+                        .addOptions([
+                            {
+                                label: 'Spam Protection',
+                                value: 'spam',
+                                emoji: '🚫',
+                                description: 'Configure spam offense punishments'
+                            },
+                            {
+                                label: 'Link Protection',
+                                value: 'links',
+                                emoji: '🔗',
+                                description: 'Configure link offense punishments'
+                            },
+                            {
+                                label: 'Caps Protection',
+                                value: 'caps',
+                                emoji: '🔊',
+                                description: 'Configure caps offense punishments'
+                            }
+                        ]);
+
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        interaction.reply({
+                            embeds: [
+                                createAutomodSetupEmbed(
+                                    `You selected **${mode}** mode.\n\n` +
+                                    'Choose which protection category you want to configure.'
+                                )
+                            ],
+                            components: [new ActionRowBuilder().addComponents(menu)],
+                            ephemeral: true
+                        })
+                    );
+                }
+
+                if (interaction.customId.startsWith('application_accept_')) {
+                    const applicationId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleAcceptApplication(interaction, applicationId)
+                    );
+                }
+
+                if (interaction.customId.startsWith('application_deny_')) {
+                    const applicationId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `button ${interaction.customId}`, () =>
+                        handleDenyApplication(interaction, applicationId)
+                    );
                 }
 
                 return;
             }
 
-            if (interaction.customId === 'ticket_create') {
-                return handleCreateTicket(interaction);
-            }
-
-            if (interaction.customId.startsWith('ticket_claim_')) {
-                const ticketId = interaction.customId.split('_')[2];
-                return handleClaimTicket(interaction, ticketId);
-            }
-
-            if (interaction.customId.startsWith('ticket_close_confirm_')) {
-                const ticketId = interaction.customId.split('_')[3];
-                return handleCloseTicket(interaction, ticketId);
-            }
-
-            if (interaction.customId.startsWith('ticket_close_yes_')) {
-                const ticketId = interaction.customId.split('_')[3];
-                return handleCloseTicketConfirm(interaction, ticketId);
-            }
-
-            if (interaction.customId.startsWith('ticket_close_no_')) {
-                const ticketId = interaction.customId.split('_')[3];
-                return handleCloseTicketCancel(interaction, ticketId);
-            }
-
-            if (
-                interaction.customId === 'automod_add' ||
-                interaction.customId === 'automod_edit' ||
-                interaction.customId === 'automod_delete'
-            ) {
-                const mode = interaction.customId.split('_')[1];
-
-                const menu = new StringSelectMenuBuilder()
-                    .setCustomId(`automod_select_${mode}`)
-                    .setPlaceholder('Select a protection type')
-                    .addOptions([
-                        {
-                            label: 'Spam Protection',
-                            value: 'spam',
-                            emoji: '🚫',
-                            description: 'Configure spam offense punishments'
-                        },
-                        {
-                            label: 'Link Protection',
-                            value: 'links',
-                            emoji: '🔗',
-                            description: 'Configure link offense punishments'
-                        },
-                        {
-                            label: 'Caps Protection',
-                            value: 'caps',
-                            emoji: '🔊',
-                            description: 'Configure caps offense punishments'
-                        }
-                    ]);
-
-                return interaction.reply({
-                    embeds: [
-                        createAutomodSetupEmbed(
-                            `You selected **${mode}** mode.\n\n` +
-                            'Choose which protection category you want to configure.'
-                        )
-                    ],
-                    components: [new ActionRowBuilder().addComponents(menu)],
-                    ephemeral: true
-                });
-            }
-
-            if (interaction.customId.startsWith('application_accept_')) {
-                const applicationId = interaction.customId.split('_')[2];
-                return handleAcceptApplication(interaction, applicationId);
-            }
-
-            if (interaction.customId.startsWith('application_deny_')) {
-                const applicationId = interaction.customId.split('_')[2];
-                return handleDenyApplication(interaction, applicationId);
-            }
-
-            return;
-        }
-
-        // ===== MODALS =====
-        if (interaction.isModalSubmit()) {
-            if (interaction.customId.startsWith('report_resolve_modal_')) {
-                const reportId = interaction.customId.split('_')[3];
-                return handleResolveReportModal(interaction, reportId);
-            }
-
-            if (interaction.customId.startsWith('report_dismiss_modal_')) {
-                const reportId = interaction.customId.split('_')[3];
-                return handleDismissReportModal(interaction, reportId);
-            }
-
-            if (interaction.customId.startsWith('application_modal_')) {
-                const positionId = interaction.customId.split('_')[2];
-                return handleApplicationModal(interaction, positionId);
-            }
-
-            if (interaction.customId.startsWith('application_deny_modal_')) {
-                const applicationId = interaction.customId.split('_')[3];
-                return handleDenyApplicationModal(interaction, applicationId);
-            }
-
-            return;
-        }
-
-        // ===== SELECT MENUS =====
-        if (interaction.isStringSelectMenu()) {
-            if (interaction.customId === 'help_menu') {
-                const selected = interaction.values[0];
-                const HELP_COLOR = '#00bfff';
-
-                const categoryOrder = ['general', 'music', 'moderation', 'automod', 'admin'];
-
-                const categoryMeta = {
-                    overview: {
-                        emoji: '👑',
-                        title: 'Infinity Help',
-                        description: 'Welcome to Infinity — a powerful moderation and utility bot built to keep your server clean, organised, and easy to manage.'
-                    },
-                    general: {
-                        emoji: '⚙️',
-                        title: 'General & Utility',
-                        description: 'Core utility and everyday commands for members and staff.'
-                    },
-                    music: {
-                        emoji: '🎵',
-                        title: 'Music',
-                        description: 'Music playback and audio controls.'
-                    },
-                    moderation: {
-                        emoji: '🛡️',
-                        title: 'Moderation',
-                        description: 'Essential moderation tools for warnings, punishments, and channel control.'
-                    },
-                    automod: {
-                        emoji: '🤖',
-                        title: 'Automod System',
-                        description: 'Automatic protection against spam, links, caps abuse, and repeat offenses.'
-                    },
-                    admin: {
-                        emoji: '🛠️',
-                        title: 'Admin & Setup',
-                        description: 'Server setup, management systems, and advanced configuration tools.'
-                    }
-                };
-
-                const formatCategory = (cat) => cat.charAt(0).toUpperCase() + cat.slice(1);
-
-                const categories = {};
-                interaction.client.commands.forEach(cmd => {
-                    if (!cmd.category) return;
-                    if (!categories[cmd.category]) categories[cmd.category] = [];
-                    categories[cmd.category].push(cmd);
-                });
-
-                Object.keys(categories).forEach(category => {
-                    categories[category].sort((a, b) => a.name.localeCompare(b.name));
-                });
-
-                const visibleCategories = categoryOrder.filter(cat => categories[cat]?.length);
-
-                const menu = new ActionRowBuilder().addComponents(
-                    new StringSelectMenuBuilder()
-                        .setCustomId('help_menu')
-                        .setPlaceholder('Select a help category')
-                        .addOptions([
-                            {
-                                label: 'Home',
-                                value: 'overview',
-                                emoji: categoryMeta.overview.emoji,
-                                description: 'Overview, quick start, and featured commands',
-                                default: selected === 'overview'
-                            },
-                            ...visibleCategories.map(cat => ({
-                                label: categoryMeta[cat]?.title || formatCategory(cat),
-                                value: cat,
-                                emoji: categoryMeta[cat]?.emoji || '📁',
-                                description: categoryMeta[cat]?.description?.slice(0, 100) || `View ${formatCategory(cat)} commands`,
-                                default: selected === cat
-                            }))
-                        ])
-                );
-
-                let embed;
-
-                if (selected === 'overview') {
-                    const categorySummary = visibleCategories
-                        .map(cat => {
-                            const meta = categoryMeta[cat];
-                            return `${meta?.emoji || '📁'} **${meta?.title || formatCategory(cat)}** — \`${categories[cat].length}\` command${categories[cat].length === 1 ? '' : 's'}`;
-                        })
-                        .join('\n') || 'No command categories found.';
-
-                    embed = new EmbedBuilder()
-                        .setTitle('👑 Infinity Help Center')
-                        .setColor(HELP_COLOR)
-                        .setDescription(
-                            '**Welcome to Infinity**\n' +
-                            'A powerful moderation and utility bot designed to keep your server clean, organised, and easy to manage.\n\n' +
-                            'Use the dropdown below to explore each command category.'
-                        )
-                        .addFields(
-                            {
-                                name: '🚀 Quick Start',
-                                value:
-                                    '• `/setlogs` — set your moderation log channel\n' +
-                                    '• `/setwelcomeconfig` — configure welcome messages\n' +
-                                    '• `/ticketpanel` — create your ticket panel\n' +
-                                    '• `/applicationpanel` — set up applications\n' +
-                                    '• `/automod` — configure automatic moderation'
-                            },
-                            {
-                                name: '⭐ Popular Commands',
-                                value:
-                                    '• `/warn`\n' +
-                                    '• `/kick`\n' +
-                                    '• `/ban`\n' +
-                                    '• `/clear`\n' +
-                                    '• `/timeout`\n' +
-                                    '• `/leaderboard`'
-                            },
-                            {
-                                name: '📚 Categories',
-                                value: categorySummary
-                            }
-                        )
-                        .setFooter({ text: 'Infinity Bot • Command System ⚡' })
-                        .setTimestamp();
-                } else {
-                    const commands = categories[selected] || [];
-                    const meta = categoryMeta[selected] || {
-                        emoji: '📁',
-                        title: formatCategory(selected),
-                        description: `View all ${formatCategory(selected)} commands.`
-                    };
-
-                    embed = new EmbedBuilder()
-                        .setTitle(`${meta.emoji} ${meta.title} Commands`)
-                        .setColor(HELP_COLOR)
-                        .setDescription(
-                            `${meta.description}\n\n` +
-                            'Use the dropdown below to switch to another category.'
-                        )
-                        .setFooter({ text: 'Infinity Bot • Command System ⚡' })
-                        .setTimestamp();
-
-                    if (!commands.length) {
-                        embed.addFields({
-                            name: 'No commands found',
-                            value: 'There are no commands in this category yet.'
-                        });
-                    } else {
-                        embed.addFields(
-                            commands.map(cmd => ({
-                                name: `${meta.emoji} ${cmd.name}`,
-                                value:
-                                    `**Description:** ${cmd.description || 'No description provided.'}\n` +
-                                    `**Usage:** \`${cmd.usage || 'N/A'}\``
-                            }))
-                        );
-                    }
-                }
-
-                return interaction.update({
-                    embeds: [embed],
-                    components: [menu]
-                });
-            }
-
-            if (interaction.customId === 'application_position_select') {
-                const positionId = interaction.values[0];
-                return handleCreateApplication(interaction, positionId);
-            }
-
-            if (interaction.customId.startsWith('automod_select_')) {
-                const mode = interaction.customId.split('_')[2];
-                const type = interaction.values[0];
-
-                const offenseMenu = new StringSelectMenuBuilder()
-                    .setCustomId(`automod_offense_${mode}_${type}`)
-                    .setPlaceholder('Select an offense level')
-                    .addOptions(
-                        Array.from({ length: 5 }, (_, i) => ({
-                            label: `Offense #${i + 1}`,
-                            value: `${i + 1}`,
-                            description: `Configure punishment for offense #${i + 1}`
-                        }))
+            // ===== MODALS =====
+            if (interaction.isModalSubmit()) {
+                if (interaction.customId.startsWith('report_resolve_modal_')) {
+                    const reportId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                        handleResolveReportModal(interaction, reportId)
                     );
-
-                await interaction.deferUpdate();
-
-                return interaction.editReply({
-                    embeds: [
-                        createAutomodSetupEmbed(
-                            `**Protection Type:** \`${type}\`\n` +
-                            `**Mode:** \`${mode}\`\n\n` +
-                            'Now choose which offense level you want to configure.'
-                        )
-                    ],
-                    components: [new ActionRowBuilder().addComponents(offenseMenu)]
-                });
-            }
-
-            if (interaction.customId.startsWith('automod_offense_')) {
-                const parts = interaction.customId.split('_');
-                const mode = parts[2];
-                const type = parts[3];
-                const offense = interaction.values[0];
-
-                if (mode === 'delete') {
-                    return applyRule(interaction, type, offense, null, null, 'delete');
                 }
 
-                const actionMenu = new StringSelectMenuBuilder()
-                    .setCustomId(`automod_action_${mode}_${type}_${offense}`)
-                    .setPlaceholder('Select a punishment')
-                    .addOptions([
-                        {
-                            label: 'Warn',
-                            value: 'warn',
-                            emoji: '⚠️',
-                            description: 'Issue a warning'
-                        },
-                        {
-                            label: 'Timeout',
-                            value: 'timeout',
-                            emoji: '⏳',
-                            description: 'Temporarily timeout the user'
-                        },
-                        {
-                            label: 'Kick',
-                            value: 'kick',
-                            emoji: '👢',
-                            description: 'Kick the user from the server'
-                        }
-                    ]);
+                if (interaction.customId.startsWith('report_dismiss_modal_')) {
+                    const reportId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                        handleDismissReportModal(interaction, reportId)
+                    );
+                }
 
-                await interaction.deferUpdate();
+                if (interaction.customId.startsWith('application_modal_')) {
+                    const positionId = interaction.customId.split('_')[2];
+                    return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                        handleApplicationModal(interaction, positionId)
+                    );
+                }
 
-                return interaction.editReply({
-                    embeds: [
-                        createAutomodSetupEmbed(
-                            `**Protection Type:** \`${type}\`\n` +
-                            `**Offense:** \`#${offense}\`\n` +
-                            `**Mode:** \`${mode}\`\n\n` +
-                            'Choose the punishment for this offense.'
-                        )
-                    ],
-                    components: [new ActionRowBuilder().addComponents(actionMenu)]
-                });
+                if (interaction.customId.startsWith('application_deny_modal_')) {
+                    const applicationId = interaction.customId.split('_')[3];
+                    return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                        handleDenyApplicationModal(interaction, applicationId)
+                    );
+                }
+
+                return;
             }
 
-            if (interaction.customId.startsWith('automod_action_')) {
-                const parts = interaction.customId.split('_');
-                const mode = parts[2];
-                const type = parts[3];
-                const offense = parts[4];
-                const action = interaction.values[0];
+            // ===== SELECT MENUS =====
+            if (interaction.isStringSelectMenu()) {
+                if (interaction.customId === 'help_menu') {
+                    return safeRun(interaction, `select ${interaction.customId}`, async () => {
+                        const selected = interaction.values[0];
+                        const HELP_COLOR = '#00bfff';
 
-                if (action === 'timeout') {
-                    const durationMenu = new StringSelectMenuBuilder()
-                        .setCustomId(`automod_duration_${mode}_${type}_${offense}`)
-                        .setPlaceholder('Select a timeout duration')
-                        .addOptions([
-                            {
-                                label: '10 Seconds',
-                                value: '10000',
-                                description: 'Very short timeout'
+                        const categoryOrder = ['general', 'music', 'moderation', 'automod', 'admin'];
+
+                        const categoryMeta = {
+                            overview: {
+                                emoji: '👑',
+                                title: 'Infinity Help',
+                                description: 'Welcome to Infinity — a powerful moderation and utility bot built to keep your server clean, organised, and easy to manage.'
                             },
-                            {
-                                label: '1 Minute',
-                                value: '60000',
-                                description: 'Short timeout'
+                            general: {
+                                emoji: '⚙️',
+                                title: 'General & Utility',
+                                description: 'Core utility and everyday commands for members and staff.'
                             },
-                            {
-                                label: '5 Minutes',
-                                value: '300000',
-                                description: 'Medium timeout'
+                            music: {
+                                emoji: '🎵',
+                                title: 'Music',
+                                description: 'Music playback and audio controls.'
                             },
-                            {
-                                label: '10 Minutes',
-                                value: '600000',
-                                description: 'Long timeout'
+                            moderation: {
+                                emoji: '🛡️',
+                                title: 'Moderation',
+                                description: 'Essential moderation tools for warnings, punishments, and channel control.'
+                            },
+                            automod: {
+                                emoji: '🤖',
+                                title: 'Automod System',
+                                description: 'Automatic protection against spam, links, caps abuse, and repeat offenses.'
+                            },
+                            admin: {
+                                emoji: '🛠️',
+                                title: 'Admin & Setup',
+                                description: 'Server setup, management systems, and advanced configuration tools.'
                             }
-                        ]);
+                        };
 
-                    await interaction.deferUpdate();
+                        const formatCategory = (cat) => cat.charAt(0).toUpperCase() + cat.slice(1);
 
-                    return interaction.editReply({
-                        embeds: [
-                            createAutomodSetupEmbed(
-                                `**Protection Type:** \`${type}\`\n` +
-                                `**Offense:** \`#${offense}\`\n` +
-                                `**Punishment:** \`timeout\`\n\n` +
-                                'Choose the timeout duration.'
-                            )
-                        ],
-                        components: [new ActionRowBuilder().addComponents(durationMenu)]
+                        const categories = {};
+                        interaction.client.commands.forEach(cmd => {
+                            if (!cmd.category) return;
+                            if (!categories[cmd.category]) categories[cmd.category] = [];
+                            categories[cmd.category].push(cmd);
+                        });
+
+                        Object.keys(categories).forEach(category => {
+                            categories[category].sort((a, b) => a.name.localeCompare(b.name));
+                        });
+
+                        const visibleCategories = categoryOrder.filter(cat => categories[cat]?.length);
+
+                        const menu = new ActionRowBuilder().addComponents(
+                            new StringSelectMenuBuilder()
+                                .setCustomId('help_menu')
+                                .setPlaceholder('Select a help category')
+                                .addOptions([
+                                    {
+                                        label: 'Home',
+                                        value: 'overview',
+                                        emoji: categoryMeta.overview.emoji,
+                                        description: 'Overview, quick start, and featured commands',
+                                        default: selected === 'overview'
+                                    },
+                                    ...visibleCategories.map(cat => ({
+                                        label: categoryMeta[cat]?.title || formatCategory(cat),
+                                        value: cat,
+                                        emoji: categoryMeta[cat]?.emoji || '📁',
+                                        description: categoryMeta[cat]?.description?.slice(0, 100) || `View ${formatCategory(cat)} commands`,
+                                        default: selected === cat
+                                    }))
+                                ])
+                        );
+
+                        let embed;
+
+                        if (selected === 'overview') {
+                            const categorySummary = visibleCategories
+                                .map(cat => {
+                                    const meta = categoryMeta[cat];
+                                    return `${meta?.emoji || '📁'} **${meta?.title || formatCategory(cat)}** — \`${categories[cat].length}\` command${categories[cat].length === 1 ? '' : 's'}`;
+                                })
+                                .join('\n') || 'No command categories found.';
+
+                            embed = new EmbedBuilder()
+                                .setTitle('👑 Infinity Help Center')
+                                .setColor(HELP_COLOR)
+                                .setDescription(
+                                    '**Welcome to Infinity**\n' +
+                                    'A powerful moderation and utility bot designed to keep your server clean, organised, and easy to manage.\n\n' +
+                                    'Use the dropdown below to explore each command category.'
+                                )
+                                .addFields(
+                                    {
+                                        name: '🚀 Quick Start',
+                                        value:
+                                            '• `/setlogs` — set your moderation log channel\n' +
+                                            '• `/setwelcomeconfig` — configure welcome messages\n' +
+                                            '• `/ticketpanel` — create your ticket panel\n' +
+                                            '• `/applicationpanel` — set up applications\n' +
+                                            '• `/automod` — configure automatic moderation'
+                                    },
+                                    {
+                                        name: '⭐ Popular Commands',
+                                        value:
+                                            '• `/warn`\n' +
+                                            '• `/kick`\n' +
+                                            '• `/ban`\n' +
+                                            '• `/clear`\n' +
+                                            '• `/timeout`\n' +
+                                            '• `/leaderboard`'
+                                    },
+                                    {
+                                        name: '📚 Categories',
+                                        value: categorySummary
+                                    }
+                                )
+                                .setFooter({ text: 'Infinity Bot • Command System ⚡' })
+                                .setTimestamp();
+                        } else {
+                            const commands = categories[selected] || [];
+                            const meta = categoryMeta[selected] || {
+                                emoji: '📁',
+                                title: formatCategory(selected),
+                                description: `View all ${formatCategory(selected)} commands.`
+                            };
+
+                            embed = new EmbedBuilder()
+                                .setTitle(`${meta.emoji} ${meta.title} Commands`)
+                                .setColor(HELP_COLOR)
+                                .setDescription(
+                                    `${meta.description}\n\n` +
+                                    'Use the dropdown below to switch to another category.'
+                                )
+                                .setFooter({ text: 'Infinity Bot • Command System ⚡' })
+                                .setTimestamp();
+
+                            if (!commands.length) {
+                                embed.addFields({
+                                    name: 'No commands found',
+                                    value: 'There are no commands in this category yet.'
+                                });
+                            } else {
+                                embed.addFields(
+                                    commands.map(cmd => ({
+                                        name: `${meta.emoji} ${cmd.name}`,
+                                        value:
+                                            `**Description:** ${cmd.description || 'No description provided.'}\n` +
+                                            `**Usage:** \`${cmd.usage || 'N/A'}\``
+                                    }))
+                                );
+                            }
+                        }
+
+                        return interaction.update({
+                            embeds: [embed],
+                            components: [menu]
+                        });
                     });
                 }
 
-                return applyRule(interaction, type, offense, action, null, mode);
-            }
+                if (interaction.customId === 'application_position_select') {
+                    const positionId = interaction.values[0];
+                    return safeRun(interaction, `select ${interaction.customId}`, () =>
+                        handleCreateApplication(interaction, positionId)
+                    );
+                }
 
-            if (interaction.customId.startsWith('automod_duration_')) {
-                const parts = interaction.customId.split('_');
-                const mode = parts[2];
-                const type = parts[3];
-                const offense = parts[4];
-                const duration = interaction.values[0];
+                if (interaction.customId.startsWith('automod_select_')) {
+                    return safeRun(interaction, `select ${interaction.customId}`, async () => {
+                        const mode = interaction.customId.split('_')[2];
+                        const type = interaction.values[0];
 
-                return applyRule(interaction, type, offense, 'timeout', duration, mode);
+                        const offenseMenu = new StringSelectMenuBuilder()
+                            .setCustomId(`automod_offense_${mode}_${type}`)
+                            .setPlaceholder('Select an offense level')
+                            .addOptions(
+                                Array.from({ length: 5 }, (_, i) => ({
+                                    label: `Offense #${i + 1}`,
+                                    value: `${i + 1}`,
+                                    description: `Configure punishment for offense #${i + 1}`
+                                }))
+                            );
+
+                        await interaction.deferUpdate();
+
+                        return interaction.editReply({
+                            embeds: [
+                                createAutomodSetupEmbed(
+                                    `**Protection Type:** \`${type}\`\n` +
+                                    `**Mode:** \`${mode}\`\n\n` +
+                                    'Now choose which offense level you want to configure.'
+                                )
+                            ],
+                            components: [new ActionRowBuilder().addComponents(offenseMenu)]
+                        });
+                    });
+                }
+
+                if (interaction.customId.startsWith('automod_offense_')) {
+                    return safeRun(interaction, `select ${interaction.customId}`, async () => {
+                        const parts = interaction.customId.split('_');
+                        const mode = parts[2];
+                        const type = parts[3];
+                        const offense = interaction.values[0];
+
+                        if (mode === 'delete') {
+                            return applyRule(interaction, type, offense, null, null, 'delete');
+                        }
+
+                        const actionMenu = new StringSelectMenuBuilder()
+                            .setCustomId(`automod_action_${mode}_${type}_${offense}`)
+                            .setPlaceholder('Select a punishment')
+                            .addOptions([
+                                {
+                                    label: 'Warn',
+                                    value: 'warn',
+                                    emoji: '⚠️',
+                                    description: 'Issue a warning'
+                                },
+                                {
+                                    label: 'Timeout',
+                                    value: 'timeout',
+                                    emoji: '⏳',
+                                    description: 'Temporarily timeout the user'
+                                },
+                                {
+                                    label: 'Kick',
+                                    value: 'kick',
+                                    emoji: '👢',
+                                    description: 'Kick the user from the server'
+                                }
+                            ]);
+
+                        await interaction.deferUpdate();
+
+                        return interaction.editReply({
+                            embeds: [
+                                createAutomodSetupEmbed(
+                                    `**Protection Type:** \`${type}\`\n` +
+                                    `**Offense:** \`#${offense}\`\n` +
+                                    `**Mode:** \`${mode}\`\n\n` +
+                                    'Choose the punishment for this offense.'
+                                )
+                            ],
+                            components: [new ActionRowBuilder().addComponents(actionMenu)]
+                        });
+                    });
+                }
+
+                if (interaction.customId.startsWith('automod_action_')) {
+                    return safeRun(interaction, `select ${interaction.customId}`, async () => {
+                        const parts = interaction.customId.split('_');
+                        const mode = parts[2];
+                        const type = parts[3];
+                        const offense = parts[4];
+                        const action = interaction.values[0];
+
+                        if (action === 'timeout') {
+                            const durationMenu = new StringSelectMenuBuilder()
+                                .setCustomId(`automod_duration_${mode}_${type}_${offense}`)
+                                .setPlaceholder('Select a timeout duration')
+                                .addOptions([
+                                    {
+                                        label: '10 Seconds',
+                                        value: '10000',
+                                        description: 'Very short timeout'
+                                    },
+                                    {
+                                        label: '1 Minute',
+                                        value: '60000',
+                                        description: 'Short timeout'
+                                    },
+                                    {
+                                        label: '5 Minutes',
+                                        value: '300000',
+                                        description: 'Medium timeout'
+                                    },
+                                    {
+                                        label: '10 Minutes',
+                                        value: '600000',
+                                        description: 'Long timeout'
+                                    }
+                                ]);
+
+                            await interaction.deferUpdate();
+
+                            return interaction.editReply({
+                                embeds: [
+                                    createAutomodSetupEmbed(
+                                        `**Protection Type:** \`${type}\`\n` +
+                                        `**Offense:** \`#${offense}\`\n` +
+                                        `**Punishment:** \`timeout\`\n\n` +
+                                        'Choose the timeout duration.'
+                                    )
+                                ],
+                                components: [new ActionRowBuilder().addComponents(durationMenu)]
+                            });
+                        }
+
+                        return applyRule(interaction, type, offense, action, null, mode);
+                    });
+                }
+
+                if (interaction.customId.startsWith('automod_duration_')) {
+                    return safeRun(interaction, `select ${interaction.customId}`, async () => {
+                        const parts = interaction.customId.split('_');
+                        const mode = parts[2];
+                        const type = parts[3];
+                        const offense = parts[4];
+                        const duration = interaction.values[0];
+
+                        return applyRule(interaction, type, offense, 'timeout', duration, mode);
+                    });
+                }
             }
+        } catch (error) {
+            console.error('❌ Unhandled interactionCreate error:', error);
+            return safeErrorReply(interaction);
         }
     }
 };

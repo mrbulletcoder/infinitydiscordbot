@@ -5,12 +5,18 @@ const {
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
 
 module.exports = {
     name: 'kick',
     description: 'Remove a user from the server.',
     usage: '!kick @user [reason]',
-    userPermissions: PermissionFlagsBits.KickMembers,
+    userPermissions: [PermissionFlagsBits.KickMembers],
+    botPermissions: [PermissionFlagsBits.KickMembers, PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('kick')
@@ -27,17 +33,7 @@ module.exports = {
 
         const reason = args.slice(1).join(' ') || 'No reason provided';
 
-        if (member.id === message.author.id) {
-            return message.reply('❌ You cannot kick yourself.');
-        }
-
-        if (member.id === message.guild.ownerId) {
-            return message.reply('❌ You cannot kick the server owner.');
-        }
-
-        if (member.roles.highest.position >= message.member.roles.highest.position) {
-            return message.reply('❌ You cannot kick someone with an equal or higher role.');
-        }
+        if (!(await checkPrefixHierarchy(message, member))) return;
 
         if (!member.kickable) {
             return message.reply('❌ Cannot kick this user.');
@@ -71,51 +67,52 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Kick Notice' })
                 .setTimestamp();
 
-            await member.send({ embeds: [dmEmbed] });
+            await member.send({ embeds: [dmEmbed] }).catch(() => null);
+
+            await member.kick(reason);
+
+            await logAction({
+                client: message.client,
+                guild: message.guild,
+                action: '👢 Kick',
+                user: member.user,
+                moderator: message.author,
+                reason,
+                color: '#ff9900'
+            });
+
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: '👢 Kick Executed',
+                    iconURL: member.user.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#ff9900')
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `${member.user.tag}\n\`${member.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${message.author.tag}\n\`${message.author.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: `> ${reason}`,
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Kick System' })
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
         } catch (error) {
-            console.log('Failed to DM kicked user:', error.message);
+            console.error('Kick Command Error:', error);
+            return message.reply('❌ Failed to kick user.');
         }
-
-        await member.kick(reason);
-
-        await logAction({
-            client: message.client,
-            guild: message.guild,
-            action: '👢 Kick',
-            user: member.user,
-            moderator: message.author,
-            reason,
-            color: '#ff9900'
-        });
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '👢 Kick Executed',
-                iconURL: member.user.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#ff9900')
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${member.user.tag}\n\`${member.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${message.author.tag}\n\`${message.author.id}\``,
-                    inline: true
-                },
-                {
-                    name: '📄 Reason',
-                    value: `> ${reason}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Kick System' })
-            .setTimestamp();
-
-        message.reply({ embeds: [embed] });
     },
 
     async executeSlash(interaction) {
@@ -127,17 +124,7 @@ module.exports = {
             return interaction.reply({ content: '❌ User not found in this server.', ephemeral: true });
         }
 
-        if (member.id === interaction.user.id) {
-            return interaction.reply({ content: '❌ You cannot kick yourself.', ephemeral: true });
-        }
-
-        if (member.id === interaction.guild.ownerId) {
-            return interaction.reply({ content: '❌ You cannot kick the server owner.', ephemeral: true });
-        }
-
-        if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: '❌ You cannot kick someone with an equal or higher role.', ephemeral: true });
-        }
+        if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.kickable) {
             return interaction.reply({ content: '❌ Cannot kick this user.', ephemeral: true });
@@ -173,50 +160,51 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Kick Notice' })
                 .setTimestamp();
 
-            await member.send({ embeds: [dmEmbed] });
+            await member.send({ embeds: [dmEmbed] }).catch(() => null);
+
+            await member.kick(reason);
+
+            await logAction({
+                client: interaction.client,
+                guild: interaction.guild,
+                action: '👢 Kick',
+                user: member.user,
+                moderator: interaction.user,
+                reason,
+                color: '#ff9900'
+            });
+
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: '👢 Kick Executed',
+                    iconURL: member.user.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#ff9900')
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `${member.user.tag}\n\`${member.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: `> ${reason}`,
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Kick System' })
+                .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.log('Failed to DM kicked user:', error.message);
+            console.error('Kick Command Error:', error);
+            return interaction.editReply({ content: '❌ Failed to kick user.' });
         }
-
-        await member.kick(reason);
-
-        await logAction({
-            client: interaction.client,
-            guild: interaction.guild,
-            action: '👢 Kick',
-            user: member.user,
-            moderator: interaction.user,
-            reason,
-            color: '#ff9900'
-        });
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '👢 Kick Executed',
-                iconURL: member.user.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#ff9900')
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${member.user.tag}\n\`${member.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                },
-                {
-                    name: '📄 Reason',
-                    value: `> ${reason}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Kick System' })
-            .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
     }
 };

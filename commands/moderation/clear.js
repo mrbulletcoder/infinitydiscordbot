@@ -11,7 +11,15 @@ module.exports = {
     name: 'clear',
     description: 'Advanced message cleanup command.',
     usage: '!clear [amount] [@user] / /clear',
-    userPermissions: PermissionFlagsBits.ManageMessages,
+    userPermissions: [PermissionFlagsBits.ManageMessages],
+    botPermissions: [
+        PermissionFlagsBits.ManageMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('clear')
@@ -172,12 +180,11 @@ async function runClear(ctx, filters, isSlash = false) {
             await channel.send({ embeds: [embed] });
         }
     } catch (err) {
-        console.error(err);
+        console.error('Clear Command Error:', err);
         if (isSlash) {
-            ctx.followUp({ content: '❌ Failed to clear messages.', ephemeral: true });
-        } else {
-            ctx.reply('❌ Failed to clear messages.');
+            return ctx.followUp({ content: '❌ Failed to clear messages.', ephemeral: true }).catch(() => null);
         }
+        return ctx.reply('❌ Failed to clear messages.').catch(() => null);
     }
 }
 

@@ -5,12 +5,18 @@ const {
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
 
 module.exports = {
     name: 'ban',
     description: 'Permanently ban a user from the server.',
     usage: '!ban @user [reason]',
-    userPermissions: PermissionFlagsBits.BanMembers,
+    userPermissions: [PermissionFlagsBits.BanMembers],
+    botPermissions: [PermissionFlagsBits.BanMembers, PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('ban')
@@ -27,17 +33,7 @@ module.exports = {
 
         const reason = args.slice(1).join(' ') || 'No reason provided';
 
-        if (member.id === message.author.id) {
-            return message.reply('❌ You cannot ban yourself.');
-        }
-
-        if (member.id === message.guild.ownerId) {
-            return message.reply('❌ You cannot ban the server owner.');
-        }
-
-        if (member.roles.highest.position >= message.member.roles.highest.position) {
-            return message.reply('❌ You cannot ban someone with an equal or higher role.');
-        }
+        if (!(await checkPrefixHierarchy(message, member))) return;
 
         if (!member.bannable) {
             return message.reply('❌ Cannot ban this user.');
@@ -71,51 +67,52 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Ban Notice' })
                 .setTimestamp();
 
-            await member.send({ embeds: [dmEmbed] });
+            await member.send({ embeds: [dmEmbed] }).catch(() => null);
+
+            await member.ban({ reason });
+
+            await logAction({
+                client: message.client,
+                guild: message.guild,
+                action: '🔨 Ban',
+                user: member.user,
+                moderator: message.author,
+                reason,
+                color: '#ff0000'
+            });
+
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: '🔨 Ban Executed',
+                    iconURL: member.user.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#ff0000')
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `${member.user.tag}\n\`${member.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${message.author.tag}\n\`${message.author.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: `> ${reason}`,
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Ban System' })
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
         } catch (error) {
-            console.log('Failed to DM Banned user:', error.message);
+            console.error('Ban Command Error:', error);
+            return message.reply('❌ Failed to ban user.');
         }
-
-        await member.ban({ reason });
-
-        await logAction({
-            client: message.client,
-            guild: message.guild,
-            action: '🔨 Ban',
-            user: member.user,
-            moderator: message.author,
-            reason,
-            color: '#ff0000'
-        });
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '🔨 Ban Executed',
-                iconURL: member.user.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#ff0000')
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${member.user.tag}\n\`${member.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${message.author.tag}\n\`${message.author.id}\``,
-                    inline: true
-                },
-                {
-                    name: '📄 Reason',
-                    value: `> ${reason}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Ban System' })
-            .setTimestamp();
-
-        message.reply({ embeds: [embed] });
     },
 
     async executeSlash(interaction) {
@@ -127,17 +124,7 @@ module.exports = {
             return interaction.reply({ content: '❌ User not found in this server.', ephemeral: true });
         }
 
-        if (member.id === interaction.user.id) {
-            return interaction.reply({ content: '❌ You cannot ban yourself.', ephemeral: true });
-        }
-
-        if (member.id === interaction.guild.ownerId) {
-            return interaction.reply({ content: '❌ You cannot ban the server owner.', ephemeral: true });
-        }
-
-        if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: '❌ You cannot ban someone with an equal or higher role.', ephemeral: true });
-        }
+        if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.bannable) {
             return interaction.reply({ content: '❌ Cannot ban this user.', ephemeral: true });
@@ -173,50 +160,51 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Ban Notice' })
                 .setTimestamp();
 
-            await member.send({ embeds: [dmEmbed] });
+            await member.send({ embeds: [dmEmbed] }).catch(() => null);
+
+            await member.ban({ reason });
+
+            await logAction({
+                client: interaction.client,
+                guild: interaction.guild,
+                action: '🔨 Ban',
+                user: member.user,
+                moderator: interaction.user,
+                reason,
+                color: '#ff0000'
+            });
+
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: '🔨 Ban Executed',
+                    iconURL: member.user.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#ff0000')
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `${member.user.tag}\n\`${member.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: `> ${reason}`,
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Ban System' })
+                .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            console.log('Failed to DM Banned user:', error.message);
+            console.error('Ban Command Error:', error);
+            return interaction.editReply({ content: '❌ Failed to ban user.' });
         }
-
-        await member.ban({ reason });
-
-        await logAction({
-            client: interaction.client,
-            guild: interaction.guild,
-            action: '🔨 Ban',
-            user: member.user,
-            moderator: interaction.user,
-            reason,
-            color: '#ff0000'
-        });
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '🔨 Ban Executed',
-                iconURL: member.user.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#ff0000')
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${member.user.tag}\n\`${member.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                },
-                {
-                    name: '📄 Reason',
-                    value: `> ${reason}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Ban System' })
-            .setTimestamp();
-
-        interaction.editReply({ embeds: [embed] });
     }
 };

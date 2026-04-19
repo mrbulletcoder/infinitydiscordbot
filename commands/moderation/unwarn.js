@@ -1,12 +1,21 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { pool } = require('../../database');
 const logAction = require('../../utils/logAction');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
+const {
+    getWarnings,
+    deleteWarningById
+} = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'unwarn',
     description: 'Remove a specific warning from a user.',
     usage: '!unwarn @user <warning number>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('unwarn')
@@ -27,14 +36,18 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executePrefix(message, args) {
+        const targetMember = message.mentions.members.first();
         const targetUser = message.mentions.users.first();
-        if (!targetUser) {
+
+        if (!targetUser || !targetMember) {
             return message.reply('❌ Mention a user.');
         }
 
         if (targetUser.bot) {
             return message.reply('❌ You cannot unwarn bots.');
         }
+
+        if (!(await checkPrefixHierarchy(message, targetMember))) return;
 
         const warningNumber = parseInt(args[1], 10);
         if (!warningNumber || warningNumber < 1) {
@@ -54,7 +67,15 @@ module.exports = {
 
     async executeSlash(interaction) {
         const targetUser = interaction.options.getUser('user', true);
+        const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const warningNumber = interaction.options.getInteger('warning', true);
+
+        if (!targetMember) {
+            return interaction.reply({
+                content: '❌ User not found in this server.',
+                ephemeral: true
+            });
+        }
 
         if (targetUser.bot) {
             return interaction.reply({
@@ -62,6 +83,8 @@ module.exports = {
                 ephemeral: true
             });
         }
+
+        if (!(await checkSlashHierarchy(interaction, targetMember))) return;
 
         await interaction.deferReply();
 
@@ -87,13 +110,19 @@ async function removeWarning({
     isSlash
 }) {
     try {
-        const [rows] = await pool.query(
-            `SELECT id, reason, moderator_id, created_at
-             FROM warnings
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY id ASC`,
-            [guild.id, targetUser.id]
-        );
+        const result = await getWarnings(guild.id, targetUser.id);
+
+        if (!result.ok) {
+            if (isSlash) {
+                return replyTarget.editReply({
+                    content: '❌ Failed to fetch warnings.'
+                });
+            }
+
+            return replyTarget.reply('❌ Failed to fetch warnings.');
+        }
+
+        const rows = result.rows;
 
         if (!rows.length) {
             if (isSlash) {
@@ -117,12 +146,16 @@ async function removeWarning({
 
         const warning = rows[warningNumber - 1];
 
-        await pool.query(
-            `DELETE FROM warnings
-             WHERE id = ?
-             LIMIT 1`,
-            [warning.id]
-        );
+        const deleteResult = await deleteWarningById(warning.id);
+        if (!deleteResult.ok) {
+            if (isSlash) {
+                return replyTarget.editReply({
+                    content: '❌ Failed to remove warning.'
+                });
+            }
+
+            return replyTarget.reply('❌ Failed to remove warning.');
+        }
 
         const remainingWarnings = rows.length - 1;
 
@@ -136,10 +169,6 @@ async function removeWarning({
             color: '#00ff88',
             extra: `Removed Warning #${warningNumber} • Remaining: ${remainingWarnings}`
         });
-
-        const removedBy = warning.moderator_id
-            ? await client.users.fetch(warning.moderator_id).catch(() => null)
-            : null;
 
         const embed = new EmbedBuilder()
             .setAuthor({
@@ -187,17 +216,11 @@ async function removeWarning({
         console.error('Unwarn Command Error:', error);
 
         if (isSlash) {
-            if (replyTarget.deferred || replyTarget.replied) {
-                return replyTarget.editReply({
-                    content: '❌ Error removing warning.'
-                }).catch(() => { });
-            }
-
-            return replyTarget.reply({
+            return replyTarget.editReply({
                 content: '❌ Error removing warning.'
-            }).catch(() => { });
+            }).catch(() => null);
         }
 
-        return replyTarget.reply('❌ Error removing warning.').catch(() => { });
+        return replyTarget.reply('❌ Error removing warning.').catch(() => null);
     }
 }

@@ -3,6 +3,23 @@ require('dotenv').config({ quiet: true });
 
 const { testConnection } = require('./database');
 
+function validateEnv() {
+    const required = [
+        'DISCORD_TOKEN',
+        'CLIENT_ID',
+        'DB_HOST',
+        'DB_USER',
+        'DB_PASSWORD',
+        'DB_NAME'
+    ];
+
+    const missing = required.filter(key => !process.env[key]);
+
+    if (missing.length) {
+        throw new Error(`Missing required .env values: ${missing.join(', ')}`);
+    }
+}
+
 // Global process error handlers
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled Rejection:', reason);
@@ -10,6 +27,7 @@ process.on('unhandledRejection', (reason) => {
 
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
+    process.exit(1);
 });
 
 process.on('SIGINT', () => {
@@ -40,6 +58,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+client.cooldowns = new Collection();
 
 // Discord connection / shard logging
 client.on('shardDisconnect', (event, id) => {
@@ -60,6 +79,8 @@ client.on('error', (error) => {
 
 async function startBot() {
     try {
+        validateEnv();
+
         await testConnection();
 
         await require('./handlers/commandHandler')(client);

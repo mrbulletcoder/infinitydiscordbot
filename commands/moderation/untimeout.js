@@ -1,11 +1,17 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const logAction = require('../../utils/logAction');
+const {
+    checkPrefixHierarchy,
+    checkSlashHierarchy
+} = require('../../utils/checkPermissions');
 
 module.exports = {
     name: 'untimeout',
     description: 'Remove a user’s timeout.',
     usage: '!untimeout @user / /untimeout <user>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.EmbedLinks],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('untimeout')
@@ -17,6 +23,8 @@ module.exports = {
     async executePrefix(message) {
         const member = message.mentions.members.first();
         if (!member) return message.reply('❌ Mention a user.');
+
+        if (!(await checkPrefixHierarchy(message, member))) return;
 
         if (!member.communicationDisabledUntilTimestamp) {
             return message.reply('❌ That user is not timed out.');
@@ -61,9 +69,10 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Timeout System' })
                 .setTimestamp();
 
-            message.reply({ embeds: [embed] });
-        } catch {
-            message.reply('❌ Failed to remove timeout.');
+            return message.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Untimeout Command Error:', error);
+            return message.reply('❌ Failed to remove timeout.');
         }
     },
 
@@ -75,6 +84,8 @@ module.exports = {
             return interaction.reply({ content: '❌ User not found in this server.', ephemeral: true });
         }
 
+        if (!(await checkSlashHierarchy(interaction, member))) return;
+
         if (!member.communicationDisabledUntilTimestamp) {
             return interaction.reply({ content: '❌ That user is not timed out.', ephemeral: true });
         }
@@ -83,40 +94,45 @@ module.exports = {
             return interaction.reply({ content: '❌ Cannot remove timeout from this user.', ephemeral: true });
         }
 
-        await member.timeout(null);
+        try {
+            await member.timeout(null);
 
-        await logAction({
-            client: interaction.client,
-            guild: interaction.guild,
-            action: '🔓 Untimeout',
-            user: member.user,
-            moderator: interaction.user,
-            reason: 'Timeout removed',
-            color: '#00ff00'
-        });
+            await logAction({
+                client: interaction.client,
+                guild: interaction.guild,
+                action: '🔓 Untimeout',
+                user: member.user,
+                moderator: interaction.user,
+                reason: 'Timeout removed',
+                color: '#00ff00'
+            });
 
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '🔓 Timeout Removed',
-                iconURL: member.user.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#00ff88')
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${member.user.tag}\n\`${member.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Timeout System' })
-            .setTimestamp();
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: '🔓 Timeout Removed',
+                    iconURL: member.user.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#00ff88')
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `${member.user.tag}\n\`${member.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                        inline: true
+                    }
+                )
+                .setFooter({ text: 'Infinity Moderation • Timeout System' })
+                .setTimestamp();
 
-        interaction.reply({ embeds: [embed] });
+            return interaction.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Untimeout Command Error:', error);
+            return interaction.reply({ content: '❌ Failed to remove timeout.', ephemeral: true });
+        }
     }
 };

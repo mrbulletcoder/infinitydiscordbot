@@ -4,13 +4,15 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 
-const { pool } = require('../../database');
+const { getCaseByNumber } = require('../../utils/moderationDb');
 
 module.exports = {
     name: 'case',
     description: 'View detailed information about a specific moderation case.',
     usage: '!case <number> / /case <number>',
-    userPermissions: PermissionFlagsBits.ModerateMembers,
+    userPermissions: [PermissionFlagsBits.ModerateMembers],
+    botPermissions: [PermissionFlagsBits.EmbedLinks],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('case')
@@ -27,13 +29,12 @@ module.exports = {
             return message.reply('❌ Provide a case number.');
         }
 
-        const [rows] = await pool.query(
-            `SELECT case_number, action, user_id, moderator_id, reason, created_at
-             FROM cases
-             WHERE guild_id = ? AND case_number = ?
-             LIMIT 1`,
-            [message.guild.id, caseId]
-        );
+        const result = await getCaseByNumber(message.guild.id, caseId);
+        if (!result.ok) {
+            return message.reply('❌ Failed to fetch case.');
+        }
+
+        const rows = result.rows;
 
         if (!rows.length) {
             return message.reply('❌ Case not found.');
@@ -90,13 +91,15 @@ module.exports = {
     async executeSlash(interaction) {
         const caseId = interaction.options.getInteger('number', true);
 
-        const [rows] = await pool.query(
-            `SELECT case_number, action, user_id, moderator_id, reason, created_at
-             FROM cases
-             WHERE guild_id = ? AND case_number = ?
-             LIMIT 1`,
-            [interaction.guild.id, caseId]
-        );
+        const result = await getCaseByNumber(interaction.guild.id, caseId);
+        if (!result.ok) {
+            return interaction.reply({
+                content: '❌ Failed to fetch case.',
+                ephemeral: true
+            });
+        }
+
+        const rows = result.rows;
 
         if (!rows.length) {
             return interaction.reply({ content: '❌ Case not found.', ephemeral: true });
