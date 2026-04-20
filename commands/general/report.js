@@ -9,6 +9,13 @@ const {
 
 const { pool } = require('../../database');
 
+const recentReportPairs = new Map();
+const recentReporterWindows = new Map();
+
+const DUPLICATE_REPORT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const REPORT_BURST_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const REPORT_BURST_LIMIT = 3;
+
 async function getGuildSettings(guildId) {
     const [rows] = await pool.query(
         `SELECT mod_logs, report_cooldown_seconds
@@ -89,26 +96,152 @@ async function checkReportCooldown(guildId, reporterId) {
     return null;
 }
 
-async function getNextReportCaseNumber(guildId) {
-    const [rows] = await pool.query(
-        `SELECT report_case_number
-         FROM guild_settings
-         WHERE guild_id = ?
-         LIMIT 1`,
-        [guildId]
-    );
+function getDuplicateReportKey(guildId, reporterId, targetId) {
+    return `${guildId}:${reporterId}:${targetId}`;
+}
 
-    let current = Number(rows[0]?.report_case_number || 0);
-    const next = current + 1;
+function pruneReporterWindow(timestamps, now) {
+    return timestamps.filter(ts => now - ts < REPORT_BURST_WINDOW_MS);
+}
 
-    await pool.query(
-        `INSERT INTO guild_settings (guild_id, report_case_number)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE report_case_number = VALUES(report_case_number)`,
-        [guildId, next]
-    );
+function checkReportSpam(guildId, reporterId, targetId) {
+    const now = Date.now();
 
-    return next;
+    // Same reporter -> same target duplicate window
+    const duplicateKey = getDuplicateReportKey(guildId, reporterId, targetId);
+    const duplicateExpiresAt = recentReportPairs.get(duplicateKey);
+
+    if (duplicateExpiresAt && now < duplicateExpiresAt) {
+        return {
+            ok: false,
+            type: 'duplicate',
+            remainingMs: duplicateExpiresAt - now
+        };
+    }
+
+    // Reporter burst window
+    const reporterKey = `${guildId}:${reporterId}`;
+    const existing = recentReporterWindows.get(reporterKey) || [];
+    const recent = pruneReporterWindow(existing, now);
+
+    if (recent.length >= REPORT_BURST_LIMIT) {
+        const oldestRelevant = recent[0];
+        const retryAfterMs = REPORT_BURST_WINDOW_MS - (now - oldestRelevant);
+
+        return {
+            ok: false,
+            type: 'burst',
+            remainingMs: retryAfterMs
+        };
+    }
+
+    return { ok: true };
+}
+
+function registerReportSpamEntry(guildId, reporterId, targetId) {
+    const now = Date.now();
+
+    const duplicateKey = getDuplicateReportKey(guildId, reporterId, targetId);
+    recentReportPairs.set(duplicateKey, now + DUPLICATE_REPORT_WINDOW_MS);
+
+    setTimeout(() => {
+        recentReportPairs.delete(duplicateKey);
+    }, DUPLICATE_REPORT_WINDOW_MS);
+
+    const reporterKey = `${guildId}:${reporterId}`;
+    const existing = recentReporterWindows.get(reporterKey) || [];
+    const recent = pruneReporterWindow(existing, now);
+    recent.push(now);
+    recentReporterWindows.set(reporterKey, recent);
+
+    setTimeout(() => {
+        const current = recentReporterWindows.get(reporterKey) || [];
+        const pruned = pruneReporterWindow(current, Date.now());
+
+        if (pruned.length) {
+            recentReporterWindows.set(reporterKey, pruned);
+        } else {
+            recentReporterWindows.delete(reporterKey);
+        }
+    }, REPORT_BURST_WINDOW_MS);
+}
+
+async function createReportRecord({
+    guildId,
+    reporterId,
+    targetId,
+    reason
+}) {
+    let connection;
+
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        await connection.query(
+            `INSERT INTO guild_settings (guild_id)
+             VALUES (?)
+             ON DUPLICATE KEY UPDATE guild_id = guild_id`,
+            [guildId]
+        );
+
+        const [rows] = await connection.query(
+            `SELECT report_case_number
+             FROM guild_settings
+             WHERE guild_id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [guildId]
+        );
+
+        const current = Number(rows[0]?.report_case_number || 0);
+        const caseNumber = current + 1;
+
+        await connection.query(
+            `UPDATE guild_settings
+             SET report_case_number = ?
+             WHERE guild_id = ?`,
+            [caseNumber, guildId]
+        );
+
+        const [insertResult] = await connection.query(
+            `INSERT INTO reports
+            (guild_id, case_number, reporter_id, reported_user_id, reason, status, created_at)
+             VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+            [
+                guildId,
+                caseNumber,
+                reporterId,
+                targetId,
+                reason,
+                Date.now()
+            ]
+        );
+
+        await connection.commit();
+
+        return {
+            ok: true,
+            caseNumber,
+            reportId: insertResult.insertId
+        };
+    } catch (error) {
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error('Report transaction rollback failed:', rollbackError);
+            }
+        }
+
+        console.error('createReportRecord error:', error);
+        return {
+            ok: false,
+            error
+        };
+    } finally {
+        if (connection) connection.release();
+    }
 }
 
 function buildReportButtons(reportId) {
@@ -278,16 +411,16 @@ module.exports = {
     async executePrefix(message, args) {
         const targetUser = message.mentions.users.first();
 
+        if (!targetUser) {
+            return message.reply('❌ Please mention a user to report.');
+        }
+
         if (targetUser.id === message.author.id) {
             return message.reply('❌ You cannot report yourself.');
         }
 
         if (targetUser.bot) {
             return message.reply('❌ You cannot report bots.');
-        }
-
-        if (!targetUser) {
-            return message.reply('❌ Please mention a user to report.');
         }
 
         const reason = args.slice(1).join(' ').trim();
@@ -362,23 +495,47 @@ module.exports = {
                 : ctx.reply(text);
         }
 
-        const caseNumber = await getNextReportCaseNumber(guild.id);
+        const spamCheck = checkReportSpam(guild.id, reporter.id, target.id);
 
-        const [insertResult] = await pool.query(
-            `INSERT INTO reports
-            (guild_id, case_number, reporter_id, reported_user_id, reason, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'open', ?)`,
-            [
-                guild.id,
-                caseNumber,
-                reporter.id,
-                target.id,
-                reason,
-                Date.now()
-            ]
-        );
+        if (!spamCheck.ok) {
+            if (spamCheck.type === 'duplicate') {
+                const text =
+                    `⚠️ You have already reported this user recently.\n` +
+                    `Please wait **${formatDuration(spamCheck.remainingMs)}** before reporting them again.`;
 
-        const reportId = insertResult.insertId;
+                return isSlash
+                    ? ctx.editReply({ content: text })
+                    : ctx.reply(text);
+            }
+
+            if (spamCheck.type === 'burst') {
+                const text =
+                    `⚠️ You are sending reports too quickly.\n` +
+                    `Please wait **${formatDuration(spamCheck.remainingMs)}** before submitting more reports.`;
+
+                return isSlash
+                    ? ctx.editReply({ content: text })
+                    : ctx.reply(text);
+            }
+        }
+
+        const reportRecord = await createReportRecord({
+            guildId: guild.id,
+            reporterId: reporter.id,
+            targetId: target.id,
+            reason
+        });
+
+        if (!reportRecord.ok) {
+            return isSlash
+                ? ctx.editReply({ content: '❌ Failed to create report.' })
+                : ctx.reply('❌ Failed to create report.');
+        }
+
+        registerReportSpamEntry(guild.id, reporter.id, target.id);
+
+        const caseNumber = reportRecord.caseNumber;
+        const reportId = reportRecord.reportId;
         const modLogsChannel = await getModLogsChannel(guild);
 
         let sentMessage = null;

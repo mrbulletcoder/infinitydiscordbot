@@ -41,6 +41,12 @@ const {
     handleDismissReportModal
 } = require('../utils/reports');
 
+const reportActionCooldowns = new Map();
+const reportActionLocks = new Map();
+
+const REPORT_BUTTON_COOLDOWN_MS = 3000; // 3 seconds
+const REPORT_ACTION_LOCK_MS = 10000; // 10 seconds
+
 // ===== SAFE REPLY HELPERS =====
 async function safeErrorReply(interaction, message = '❌ Something went wrong while handling that interaction.') {
     try {
@@ -66,6 +72,89 @@ async function safeRun(interaction, label, fn) {
     } catch (error) {
         console.error(`❌ Error in ${label}:`, error);
         return safeErrorReply(interaction);
+    }
+}
+
+function getReportActionCooldownKey(interaction, action, reportId) {
+    return `${interaction.guildId}:${interaction.user.id}:${action}:${reportId}`;
+}
+
+function getReportActionLockKey(interaction, action, reportId) {
+    return `${interaction.guildId}:${action}:${reportId}`;
+}
+
+async function checkReportButtonSpam(interaction, action, reportId) {
+    const now = Date.now();
+
+    // Per-user cooldown
+    const cooldownKey = getReportActionCooldownKey(interaction, action, reportId);
+    const cooldownExpiresAt = reportActionCooldowns.get(cooldownKey);
+
+    if (cooldownExpiresAt && now < cooldownExpiresAt) {
+        const remaining = ((cooldownExpiresAt - now) / 1000).toFixed(1);
+
+        await safeErrorReply(
+            interaction,
+            `⏳ Please wait **${remaining}s** before trying to **${action}** this report again.`
+        );
+
+        return false;
+    }
+
+    // Per-report action lock
+    const lockKey = getReportActionLockKey(interaction, action, reportId);
+    const lockData = reportActionLocks.get(lockKey);
+
+    if (lockData && now < lockData.expiresAt && lockData.userId !== interaction.user.id) {
+        await safeErrorReply(
+            interaction,
+            `⚠️ This report is already being processed by <@${lockData.userId}>. Please wait a moment.`
+        );
+
+        return false;
+    }
+
+    reportActionCooldowns.set(cooldownKey, now + REPORT_BUTTON_COOLDOWN_MS);
+    setTimeout(() => {
+        reportActionCooldowns.delete(cooldownKey);
+    }, REPORT_BUTTON_COOLDOWN_MS);
+
+    reportActionLocks.set(lockKey, {
+        userId: interaction.user.id,
+        expiresAt: now + REPORT_ACTION_LOCK_MS
+    });
+
+    setTimeout(() => {
+        const current = reportActionLocks.get(lockKey);
+        if (current && current.userId === interaction.user.id) {
+            reportActionLocks.delete(lockKey);
+        }
+    }, REPORT_ACTION_LOCK_MS);
+
+    return true;
+}
+
+function clearReportActionLock(interaction, action, reportId) {
+    const lockKey = getReportActionLockKey(interaction, action, reportId);
+    const current = reportActionLocks.get(lockKey);
+
+    if (current && current.userId === interaction.user.id) {
+        reportActionLocks.delete(lockKey);
+    }
+}
+
+async function runReportButtonAction(interaction, action, reportId, handler) {
+    const allowed = await checkReportButtonSpam(interaction, action, reportId);
+    if (!allowed) return;
+
+    try {
+        return await safeRun(
+            interaction,
+            `report button ${action}_${reportId}`,
+            () => handler()
+        );
+    } finally {
+        clearReportActionLock(interaction, action, reportId);
     }
 }
 
@@ -404,22 +493,31 @@ module.exports = {
             if (interaction.isButton()) {
                 if (interaction.customId.startsWith('report_claim_')) {
                     const reportId = interaction.customId.split('_')[2];
-                    return safeRun(interaction, `button ${interaction.customId}`, () =>
-                        handleClaimReport(interaction, reportId)
+                    return runReportButtonAction(
+                        interaction,
+                        'claim',
+                        reportId,
+                        () => handleClaimReport(interaction, reportId)
                     );
                 }
 
                 if (interaction.customId.startsWith('report_resolve_')) {
                     const reportId = interaction.customId.split('_')[2];
-                    return safeRun(interaction, `button ${interaction.customId}`, () =>
-                        handleResolveReport(interaction, reportId)
+                    return runReportButtonAction(
+                        interaction,
+                        'resolve',
+                        reportId,
+                        () => handleResolveReport(interaction, reportId)
                     );
                 }
 
                 if (interaction.customId.startsWith('report_dismiss_')) {
                     const reportId = interaction.customId.split('_')[2];
-                    return safeRun(interaction, `button ${interaction.customId}`, () =>
-                        handleDismissReport(interaction, reportId)
+                    return runReportButtonAction(
+                        interaction,
+                        'dismiss',
+                        reportId,
+                        () => handleDismissReport(interaction, reportId)
                     );
                 }
 
