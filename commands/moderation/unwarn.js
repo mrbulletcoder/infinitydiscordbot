@@ -66,27 +66,27 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const warningNumber = interaction.options.getInteger('warning', true);
 
         if (!targetMember) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ User not found in this server.',
                 ephemeral: true
             });
         }
 
         if (targetUser.bot) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ You cannot unwarn bots.',
                 ephemeral: true
             });
         }
 
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
-
-        await interaction.deferReply();
 
         await removeWarning({
             guild: interaction.guild,
@@ -119,7 +119,7 @@ async function removeWarning({
                 });
             }
 
-            return replyTarget.reply('❌ Failed to fetch warnings.');
+            return replyTarget.editReply('❌ Failed to fetch warnings.');
         }
 
         const rows = result.rows;
@@ -131,7 +131,7 @@ async function removeWarning({
                 });
             }
 
-            return replyTarget.reply('❌ That user has no warnings.');
+            return replyTarget.editReply('❌ That user has no warnings.');
         }
 
         if (warningNumber > rows.length) {
@@ -141,7 +141,7 @@ async function removeWarning({
                 return replyTarget.editReply({ content });
             }
 
-            return replyTarget.reply(content);
+            return replyTarget.editReply(content);
         }
 
         const warning = rows[warningNumber - 1];
@@ -154,7 +154,7 @@ async function removeWarning({
                 });
             }
 
-            return replyTarget.reply('❌ Failed to remove warning.');
+            return replyTarget.editReply('❌ Failed to remove warning.');
         }
 
         const remainingWarnings = rows.length - 1;
@@ -211,7 +211,7 @@ async function removeWarning({
             return replyTarget.editReply({ embeds: [embed] });
         }
 
-        return replyTarget.reply({ embeds: [embed] });
+        return replyTarget.editReply({ embeds: [embed] });
     } catch (error) {
         console.error('Unwarn Command Error:', error);
 
@@ -221,6 +221,6 @@ async function removeWarning({
             }).catch(() => null);
         }
 
-        return replyTarget.reply('❌ Error removing warning.').catch(() => null);
+        return replyTarget.editReply('❌ Error removing warning.').catch(() => null);
     }
 }

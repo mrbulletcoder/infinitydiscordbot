@@ -85,7 +85,7 @@ module.exports = {
         const userId = interaction.options.getString('userid');
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const user = await interaction.client.users.fetch(userId);

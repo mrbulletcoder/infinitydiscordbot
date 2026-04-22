@@ -60,6 +60,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const channel = interaction.options.getChannel('channel') || interaction.channel;
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
@@ -78,8 +80,8 @@ async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }
     try {
         if (!channel || !channel.permissionOverwrites) {
             return isSlash
-                ? ctx.reply({ content: '❌ That channel cannot be unlocked.', ephemeral: true })
-                : ctx.reply('❌ That channel cannot be unlocked.');
+                ? ctx.editReply({ content: '❌ That channel cannot be unlocked.', ephemeral: true })
+                : ctx.editReply('❌ That channel cannot be unlocked.');
         }
 
         const everyoneOverwrite = channel.permissionOverwrites.cache.get(guild.roles.everyone.id);
@@ -87,8 +89,8 @@ async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }
 
         if (alreadyUnlocked) {
             return isSlash
-                ? ctx.reply({ content: '❌ That channel is already unlocked.', ephemeral: true })
-                : ctx.reply('❌ That channel is already unlocked.');
+                ? ctx.editReply({ content: '❌ That channel is already unlocked.', ephemeral: true })
+                : ctx.editReply('❌ That channel is already unlocked.');
         }
 
         await channel.permissionOverwrites.edit(guild.roles.everyone, {
@@ -120,7 +122,7 @@ async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }
             .setFooter({ text: 'Infinity Moderation • Channel Control' })
             .setTimestamp();
 
-        await ctx.reply({ embeds: [embed] });
+        await ctx.editReply({ embeds: [embed] });
 
         await logAction({
             guild,
@@ -141,12 +143,12 @@ async function unlockChannel({ channel, moderator, reason, guild, ctx, isSlash }
                 }).catch(() => null);
             }
 
-            return ctx.reply({
+            return ctx.editReply({
                 content: '❌ Failed to unlock channel.',
                 ephemeral: true
             }).catch(() => null);
         }
 
-        return ctx.reply('❌ Failed to unlock channel.').catch(() => null);
+        return ctx.editReply('❌ Failed to unlock channel.').catch(() => null);
     }
 }

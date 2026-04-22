@@ -77,21 +77,23 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const user = interaction.options.getUser('user');
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
         if (!member) {
-            return interaction.reply({ content: '❌ User not found in this server.', ephemeral: true });
+            return interaction.editReply({ content: '❌ User not found in this server.', ephemeral: true });
         }
 
         if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.communicationDisabledUntilTimestamp) {
-            return interaction.reply({ content: '❌ That user is not timed out.', ephemeral: true });
+            return interaction.editReply({ content: '❌ That user is not timed out.', ephemeral: true });
         }
 
         if (!member.moderatable) {
-            return interaction.reply({ content: '❌ Cannot remove timeout from this user.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Cannot remove timeout from this user.', ephemeral: true });
         }
 
         try {
@@ -129,10 +131,10 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Timeout System' })
                 .setTimestamp();
 
-            return interaction.reply({ embeds: [embed] });
+            return interaction.editReply({ embeds: [embed] });
         } catch (error) {
             console.error('Untimeout Command Error:', error);
-            return interaction.reply({ content: '❌ Failed to remove timeout.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Failed to remove timeout.', ephemeral: true });
         }
     }
 };

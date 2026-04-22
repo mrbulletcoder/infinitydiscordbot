@@ -100,19 +100,21 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         if (!targetMember) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ User not found in this server.',
                 ephemeral: true
             });
         }
 
         if (targetUser.bot) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ You cannot warn bots.',
                 ephemeral: true
             });
@@ -131,7 +133,7 @@ module.exports = {
         });
 
         if (!result.ok) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Failed to save warning.',
                 ephemeral: true
             });
@@ -174,6 +176,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Moderation • Warnings System' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

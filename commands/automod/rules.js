@@ -66,6 +66,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type', true);
         const offense = interaction.options.getInteger('offense', true);
@@ -75,7 +77,7 @@ module.exports = {
         const types = type === 'all' ? ['spam', 'links', 'caps'] : [type];
 
         if (action === 'timeout' && !duration) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ You must provide a duration in seconds for timeout.',
                 ephemeral: true
             });
@@ -110,6 +112,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

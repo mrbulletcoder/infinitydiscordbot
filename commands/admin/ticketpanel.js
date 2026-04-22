@@ -20,6 +20,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const [rows] = await pool.query(
             `SELECT panel_channel_id
              FROM ticket_settings
@@ -30,7 +32,7 @@ module.exports = {
 
         const settings = rows[0];
         if (!settings?.panel_channel_id) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Ticket system is not configured yet. Use `/ticketconfig` first.',
                 ephemeral: true
             });
@@ -41,7 +43,7 @@ module.exports = {
             await interaction.guild.channels.fetch(settings.panel_channel_id).catch(() => null);
 
         if (!panelChannel) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ The configured panel channel could not be found.',
                 ephemeral: true
             });
@@ -79,7 +81,7 @@ module.exports = {
             components: [row]
         });
 
-        return interaction.reply({
+        return interaction.editReply({
             content: `✅ Ticket panel sent to ${panelChannel}.`,
             ephemeral: true
         });

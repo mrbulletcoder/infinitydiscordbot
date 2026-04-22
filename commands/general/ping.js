@@ -129,9 +129,11 @@ module.exports = {
 
     // ===== SLASH =====
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const start = Date.now();
 
-        await interaction.reply({
+        await interaction.editReply({
             content: '⏳ Calculating performance...',
             fetchReply: true
         });

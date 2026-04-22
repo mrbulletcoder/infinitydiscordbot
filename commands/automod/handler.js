@@ -46,6 +46,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type');
         const state = interaction.options.getString('state');
@@ -77,7 +79,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity AutoMod System' })
                 .setTimestamp();
 
-            return interaction.reply({ embeds: [embed] });
+            return interaction.editReply({ embeds: [embed] });
         }
 
         const fieldMap = {
@@ -103,6 +105,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

@@ -111,7 +111,7 @@ module.exports = {
             return interaction.reply({ content: '❌ Cannot timeout this user.', ephemeral: true });
         }
 
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             await member.timeout(minutes * 60000, reason);

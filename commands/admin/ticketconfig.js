@@ -50,6 +50,8 @@ module.exports = {
         const transcripts = interaction.options.getChannel('transcripts', true);
         const support = interaction.options.getRole('support', true);
 
+        await interaction.deferReply({ ephemeral: true });
+
         await pool.query(
             `INSERT INTO ticket_settings
                 (guild_id, category_id, panel_channel_id, transcript_channel_id, support_role_id, updated_at)
@@ -101,6 +103,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Tickets' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

@@ -459,19 +459,19 @@ module.exports = {
             const content = '❌ This command can only be used in a server.';
             return isSlash
                 ? ctx.editReply({ content })
-                : ctx.reply(content);
+                : ctx.editReply(content);
         }
 
         if (target.id === reporter.id) {
             return isSlash
                 ? ctx.editReply({ content: '❌ You cannot report yourself.' })
-                : ctx.reply('❌ You cannot report yourself.');
+                : ctx.editReply('❌ You cannot report yourself.');
         }
 
         if (target.bot) {
             return isSlash
                 ? ctx.editReply({ content: '❌ You cannot report a bot.' })
-                : ctx.reply('❌ You cannot report a bot.');
+                : ctx.editReply('❌ You cannot report a bot.');
         }
 
         const member = await guild.members.fetch(target.id).catch(() => null);
@@ -479,7 +479,7 @@ module.exports = {
         if (!member) {
             return isSlash
                 ? ctx.editReply({ content: '❌ That user is not in this server.' })
-                : ctx.reply('❌ That user is not in this server.');
+                : ctx.editReply('❌ That user is not in this server.');
         }
 
         const cooldown = await checkReportCooldown(guild.id, reporter.id);
@@ -492,7 +492,7 @@ module.exports = {
 
             return isSlash
                 ? ctx.editReply({ content: text })
-                : ctx.reply(text);
+                : ctx.editReply(text);
         }
 
         const spamCheck = checkReportSpam(guild.id, reporter.id, target.id);
@@ -505,7 +505,7 @@ module.exports = {
 
                 return isSlash
                     ? ctx.editReply({ content: text })
-                    : ctx.reply(text);
+                    : ctx.editReply(text);
             }
 
             if (spamCheck.type === 'burst') {
@@ -515,7 +515,7 @@ module.exports = {
 
                 return isSlash
                     ? ctx.editReply({ content: text })
-                    : ctx.reply(text);
+                    : ctx.editReply(text);
             }
         }
 
@@ -529,7 +529,7 @@ module.exports = {
         if (!reportRecord.ok) {
             return isSlash
                 ? ctx.editReply({ content: '❌ Failed to create report.' })
-                : ctx.reply('❌ Failed to create report.');
+                : ctx.editReply('❌ Failed to create report.');
         }
 
         registerReportSpamEntry(guild.id, reporter.id, target.id);
@@ -569,6 +569,6 @@ module.exports = {
 
         return isSlash
             ? ctx.editReply({ embeds: [successEmbed] })
-            : ctx.reply({ embeds: [successEmbed] });
+            : ctx.editReply({ embeds: [successEmbed] });
     }
 };

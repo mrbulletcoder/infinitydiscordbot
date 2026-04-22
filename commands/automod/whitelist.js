@@ -54,6 +54,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type', true);
         const action = interaction.options.getString('action', true);
@@ -89,7 +91,7 @@ module.exports = {
         }
 
         if (!id) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ You must provide the correct option for the selected type.',
                 ephemeral: true
             });
@@ -102,7 +104,7 @@ module.exports = {
             );
 
             if (existingRows.length) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ That target is already whitelisted.',
                     ephemeral: true
                 });
@@ -122,7 +124,7 @@ module.exports = {
             );
 
             if (!existingRows.length) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ That target is not currently whitelisted.',
                     ephemeral: true
                 });
@@ -142,6 +144,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

@@ -60,11 +60,13 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        
         const targetUser = interaction.options.getUser('user', true);
 
         const result = await getCasesForUser(interaction.guild.id, targetUser.id, 10);
         if (!result.ok) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Failed to fetch case history.',
                 ephemeral: true
             });
@@ -73,7 +75,7 @@ module.exports = {
         const rows = result.rows;
 
         if (!rows.length) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ No case history found for that user.',
                 ephemeral: true
             });
@@ -94,6 +96,6 @@ module.exports = {
             .setFooter({ text: `Infinity Moderation • Showing ${rows.length} case(s)` })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

@@ -130,7 +130,7 @@ module.exports = {
             return interaction.reply({ content: '❌ Cannot kick this user.', ephemeral: true });
         }
 
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const dmEmbed = new EmbedBuilder()

@@ -201,7 +201,7 @@ module.exports = {
                 return interaction.editReply('❌ Something went wrong while updating welcome settings.');
             }
 
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Something went wrong while updating welcome settings.',
                 ephemeral: true
             }).catch(() => { });

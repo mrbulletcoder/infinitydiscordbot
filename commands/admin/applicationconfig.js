@@ -39,6 +39,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const panel = interaction.options.getChannel('panel', true);
         const review = interaction.options.getChannel('review', true);
         const cooldown = interaction.options.getInteger('cooldown') ?? 24;
@@ -87,6 +89,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Applications' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

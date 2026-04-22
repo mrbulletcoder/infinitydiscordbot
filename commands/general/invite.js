@@ -24,6 +24,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        
         return this.sendInvite(interaction);
     },
 
@@ -57,7 +59,7 @@ module.exports = {
                 .setStyle(ButtonStyle.Link)
         );
 
-        return ctx.reply({
+        return ctx.editReply({
             embeds: [embed],
             components: [row]
         });

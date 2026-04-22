@@ -147,6 +147,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
@@ -157,8 +159,8 @@ module.exports = {
         if (!guild) {
             const content = '❌ This command can only be used in a server.';
 
-            if (ctx.reply) {
-                return ctx.reply({ content, ephemeral: true }).catch(() => ctx.reply(content));
+            if (ctx.editReply) {
+                return ctx.editReply({ content });
             }
 
             return;
@@ -251,6 +253,6 @@ module.exports = {
             embed.setImage(banner);
         }
 
-        return ctx.reply({ embeds: [embed] });
+        return ctx.editReply({ embeds: [embed] });
     }
 };

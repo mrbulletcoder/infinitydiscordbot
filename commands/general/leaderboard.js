@@ -18,7 +18,7 @@ module.exports = {
         .setDescription('View the server rank leaderboard'),
 
     async executeSlash(interaction) {
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const rows = await getLeaderboard(interaction.guild.id, 10, 0);

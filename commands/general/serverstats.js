@@ -106,6 +106,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         return this.sendStats(interaction, interaction.guild);
     },
 
@@ -113,8 +115,8 @@ module.exports = {
         if (!guild) {
             const content = '❌ This command can only be used in a server.';
 
-            if (ctx.reply) {
-                return ctx.reply({ content, ephemeral: true }).catch(() => ctx.reply(content));
+            if (ctx.editReply) {
+                return ctx.editReply({ content });
             }
 
             return;
@@ -226,6 +228,6 @@ module.exports = {
             embed.setImage(guild.bannerURL({ size: 1024 }));
         }
 
-        return ctx.reply({ embeds: [embed] });
+        return ctx.editReply({ embeds: [embed] });
     }
 };

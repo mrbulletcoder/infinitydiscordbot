@@ -156,6 +156,19 @@ async function checkPrefixPermission(message, command) {
 }
 
 async function checkSlashPermission(interaction, command) {
+    // Allow commands that are marked as usable in DMs
+    if (!interaction.guild) {
+        if (command?.dmAllowed) {
+            return true;
+        }
+
+        await safeReplyInteraction(interaction, {
+            content: '❌ This command can only be used in a server.',
+            ephemeral: true
+        });
+        return false;
+    }
+
     const member = interaction.member;
     const botMember = getBotMember(interaction.guild);
 

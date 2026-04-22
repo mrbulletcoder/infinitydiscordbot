@@ -78,9 +78,27 @@ async function getCaseByNumber(guildId, caseNumber) {
 
 async function getCasesForUser(guildId, userId, limit = 10) {
     return safeQuery(
-        `SELECT case_number, action, created_at
+        `SELECT case_number, action, moderator_id, reason, created_at
          FROM cases
          WHERE guild_id = ? AND user_id = ?
+         ORDER BY case_number DESC
+         LIMIT ?`,
+        [guildId, userId, limit]
+    );
+}
+
+async function getAppealableCasesForUser(guildId, userId, limit = 10) {
+    return safeQuery(
+        `SELECT case_number, action, moderator_id, reason, created_at
+         FROM cases
+         WHERE guild_id = ?
+           AND user_id = ?
+           AND (
+                action LIKE '%Ban%'
+                OR action LIKE '%Kick%'
+                OR action LIKE '%Timeout%'
+                OR action LIKE '%Warn%'
+           )
          ORDER BY case_number DESC
          LIMIT ?`,
         [guildId, userId, limit]
@@ -94,5 +112,6 @@ module.exports = {
     deleteWarningById,
     clearWarnings,
     getCaseByNumber,
-    getCasesForUser
+    getCasesForUser,
+    getAppealableCasesForUser
 };

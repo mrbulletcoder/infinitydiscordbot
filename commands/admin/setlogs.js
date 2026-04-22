@@ -44,6 +44,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const channel = interaction.options.getChannel('channel');
 
         await pool.query(
@@ -59,6 +61,6 @@ module.exports = {
             .setColor('#00ff00')
             .setTimestamp();
 
-        interaction.reply({ embeds: [embed] });
+        interaction.editReply({ embeds: [embed] });
     }
 };

@@ -41,6 +41,16 @@ const {
     handleDismissReportModal
 } = require('../utils/reports');
 
+const {
+    handleAppealGuildSelect,
+    handleAppealCaseSelect,
+    handleAppealModal,
+    handleClaimAppeal,
+    handleApproveAppeal,
+    handleDenyAppeal,
+    handleAppealDecisionModal
+} = require('../utils/appeals');
+
 const reportActionCooldowns = new Map();
 const reportActionLocks = new Map();
 
@@ -491,6 +501,29 @@ module.exports = {
 
             // ===== BUTTONS =====
             if (interaction.isButton()) {
+                if (interaction.isButton()) {
+                    if (interaction.customId.startsWith('appeal_claim_')) {
+                        const appealId = interaction.customId.split('_')[2];
+                        return safeRun(interaction, `button ${interaction.customId}`, () =>
+                            handleClaimAppeal(interaction, appealId)
+                        );
+                    }
+
+                    if (interaction.customId.startsWith('appeal_approve_')) {
+                        const appealId = interaction.customId.split('_')[2];
+                        return safeRun(interaction, `button ${interaction.customId}`, () =>
+                            handleApproveAppeal(interaction, appealId)
+                        );
+                    }
+
+                    if (interaction.customId.startsWith('appeal_deny_')) {
+                        const appealId = interaction.customId.split('_')[2];
+                        return safeRun(interaction, `button ${interaction.customId}`, () =>
+                            handleDenyAppeal(interaction, appealId)
+                        );
+                    }
+                }
+
                 if (interaction.customId.startsWith('report_claim_')) {
                     const reportId = interaction.customId.split('_')[2];
                     return runReportButtonAction(
@@ -725,6 +758,33 @@ module.exports = {
 
             // ===== MODALS =====
             if (interaction.isModalSubmit()) {
+
+                if (interaction.isModalSubmit()) {
+                    if (interaction.customId.startsWith('appeal_modal_')) {
+                        const parts = interaction.customId.split('_');
+                        const guildId = parts[2];
+                        const caseNumber = parts[3];
+
+                        return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                            handleAppealModal(interaction, guildId, caseNumber)
+                        );
+                    }
+
+                    if (interaction.customId.startsWith('appeal_approve_modal_')) {
+                        const appealId = interaction.customId.split('_')[3];
+                        return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                            handleAppealDecisionModal(interaction, appealId, 'approved')
+                        );
+                    }
+
+                    if (interaction.customId.startsWith('appeal_deny_modal_')) {
+                        const appealId = interaction.customId.split('_')[3];
+                        return safeRun(interaction, `modal ${interaction.customId}`, () =>
+                            handleAppealDecisionModal(interaction, appealId, 'denied')
+                        );
+                    }
+                }
+
                 if (interaction.customId.startsWith('report_resolve_modal_')) {
                     const reportId = interaction.customId.split('_')[3];
                     return safeRun(interaction, `modal ${interaction.customId}`, () =>
@@ -758,6 +818,21 @@ module.exports = {
 
             // ===== SELECT MENUS =====
             if (interaction.isStringSelectMenu()) {
+                if (interaction.isStringSelectMenu()) {
+                    if (interaction.customId === 'appeal_guild_select') {
+                        return safeRun(interaction, `select ${interaction.customId}`, () =>
+                            handleAppealGuildSelect(interaction)
+                        );
+                    }
+
+                    if (interaction.customId.startsWith('appeal_case_select_')) {
+                        const guildId = interaction.customId.split('_')[3];
+                        return safeRun(interaction, `select ${interaction.customId}`, () =>
+                            handleAppealCaseSelect(interaction, guildId)
+                        );
+                    }
+                }
+
                 if (interaction.customId === 'help_menu') {
                     return safeRun(interaction, `select ${interaction.customId}`, async () => {
                         const selected = interaction.values[0];

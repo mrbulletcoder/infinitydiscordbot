@@ -51,6 +51,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const filters = {
             amount: interaction.options.getInteger('amount'),
             user: interaction.options.getUser('user'),
@@ -80,7 +82,7 @@ module.exports = {
             .setTitle('⚠️ Confirm Clear')
             .setDescription('This action will delete messages based on your filters.\nThis cannot be undone.');
 
-        await interaction.reply({
+        await interaction.editReply({
             embeds: [embed],
             components: [row],
             ephemeral: true
@@ -184,7 +186,7 @@ async function runClear(ctx, filters, isSlash = false) {
         if (isSlash) {
             return ctx.followUp({ content: '❌ Failed to clear messages.', ephemeral: true }).catch(() => null);
         }
-        return ctx.reply('❌ Failed to clear messages.').catch(() => null);
+        return ctx.editReply('❌ Failed to clear messages.').catch(() => null);
     }
 }
 

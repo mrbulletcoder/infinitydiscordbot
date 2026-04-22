@@ -69,6 +69,8 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
@@ -117,6 +119,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Bot • Avatar Intelligence ⚡' })
             .setTimestamp();
 
-        return ctx.reply({ embeds: [embed] });
+        return ctx.editReply({ embeds: [embed] });
     }
 };

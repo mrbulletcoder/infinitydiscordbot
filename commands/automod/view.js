@@ -170,6 +170,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const guildId = interaction.guild.id;
 
         const [rows] = await pool.query(
@@ -221,7 +223,7 @@ module.exports = {
                     .setDisabled(true)
             );
 
-            return interaction.reply({
+            return interaction.editReply({
                 embeds: [emptyEmbed],
                 components: [emptyRow],
                 ephemeral: true
@@ -254,7 +256,7 @@ module.exports = {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        return interaction.reply({
+        return interaction.editReply({
             embeds: [embed],
             components: [row]
         });

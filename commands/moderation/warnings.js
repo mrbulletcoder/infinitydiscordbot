@@ -58,11 +58,13 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const targetUser = interaction.options.getUser('user', true);
 
         const result = await getWarnings(interaction.guild.id, targetUser.id);
         if (!result.ok) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Failed to fetch warnings.',
                 ephemeral: true
             });
@@ -91,6 +93,6 @@ module.exports = {
             .setFooter({ text: `Infinity Moderation • Total: ${rows.length}` })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

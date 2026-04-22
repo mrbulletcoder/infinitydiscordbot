@@ -61,6 +61,8 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const sub = interaction.options.getSubcommand();
 
         if (sub === 'add') {
@@ -93,7 +95,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity Applications' })
                 .setTimestamp();
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed], ephemeral: true });
         }
 
         if (sub === 'remove') {
@@ -108,7 +110,7 @@ module.exports = {
 
             const position = rows[0];
             if (!position) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ Application position not found.',
                     ephemeral: true
                 });
@@ -120,7 +122,7 @@ module.exports = {
                 [interaction.guild.id, id]
             );
 
-            return interaction.reply({
+            return interaction.editReply({
                 content: `✅ Removed application position \`${position.name}\` (\`#${position.id}\`).`,
                 ephemeral: true
             });
@@ -138,7 +140,7 @@ module.exports = {
 
             const position = rows[0];
             if (!position) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ Application position not found.',
                     ephemeral: true
                 });
@@ -153,7 +155,7 @@ module.exports = {
                 [newState, interaction.guild.id, id]
             );
 
-            return interaction.reply({
+            return interaction.editReply({
                 content: `✅ Position \`${position.name}\` is now ${newState ? '**enabled**' : '**disabled**'}.`,
                 ephemeral: true
             });
@@ -168,7 +170,7 @@ module.exports = {
             );
 
             if (!rows.length) {
-                return interaction.reply({
+                return interaction.editReply({
                     content: '❌ No application positions have been created yet.',
                     ephemeral: true
                 });
@@ -190,7 +192,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity Applications' })
                 .setTimestamp();
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.editReply({ embeds: [embed], ephemeral: true });
         }
     }
 };

@@ -89,11 +89,13 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const caseId = interaction.options.getInteger('number', true);
 
         const result = await getCaseByNumber(interaction.guild.id, caseId);
         if (!result.ok) {
-            return interaction.reply({
+            return interaction.editReply({
                 content: '❌ Failed to fetch case.',
                 ephemeral: true
             });
@@ -102,7 +104,7 @@ module.exports = {
         const rows = result.rows;
 
         if (!rows.length) {
-            return interaction.reply({ content: '❌ Case not found.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Case not found.', ephemeral: true });
         }
 
         const foundCase = rows[0];
@@ -150,6 +152,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Moderation • Case System' })
             .setTimestamp();
 
-        return interaction.reply({ embeds: [embed] });
+        return interaction.editReply({ embeds: [embed] });
     }
 };

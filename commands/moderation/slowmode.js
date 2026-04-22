@@ -61,10 +61,12 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const seconds = interaction.options.getInteger('seconds');
 
         if (seconds < 0 || seconds > 21600) {
-            return interaction.reply({ content: '❌ Provide a number between 0 and 21600.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Provide a number between 0 and 21600.' });
         }
 
         try {
@@ -93,10 +95,10 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Channel Control' })
                 .setTimestamp();
 
-            return interaction.reply({ embeds: [embed] });
+            return interaction.editReply({ embeds: [embed] });
         } catch (error) {
             console.error('Slowmode Command Error:', error);
-            return interaction.reply({ content: '❌ Failed to update slowmode.', ephemeral: true });
+            return interaction.editReply({ content: '❌ Failed to update slowmode.', ephemeral: true });
         }
     }
 };

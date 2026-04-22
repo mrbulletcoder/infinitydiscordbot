@@ -23,7 +23,7 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const targetUser = interaction.options.getUser('user') || interaction.user;

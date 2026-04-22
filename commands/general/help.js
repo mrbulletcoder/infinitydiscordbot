@@ -228,15 +228,17 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+
         const commandName = interaction.options.getString('command')?.toLowerCase();
 
         if (commandName) {
             const cmd = interaction.client.commands.get(commandName);
             if (!cmd) {
-                return interaction.reply({ content: '❌ Command not found.', ephemeral: true });
+                return interaction.editReply({ content: '❌ Command not found.', ephemeral: true });
             }
 
-            return interaction.reply({ embeds: [createCommandEmbed(cmd)] });
+            return interaction.editReply({ embeds: [createCommandEmbed(cmd)] });
         }
 
         return sendHelp(interaction, interaction.client, true);
@@ -249,8 +251,8 @@ async function sendHelp(ctx, client, isSlash = false) {
     const menu = createHelpMenu(categories, 'overview');
 
     if (isSlash) {
-        await ctx.reply({ embeds: [embed], components: [menu] });
-    } else {
-        await ctx.reply({ embeds: [embed], components: [menu] });
+        return ctx.editReply({ embeds: [embed], components: [menu] });
     }
+
+    return ctx.reply({ embeds: [embed], components: [menu] });
 }
