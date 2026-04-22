@@ -13,7 +13,9 @@ module.exports = async function logAction({
     moderator,
     reason,
     color,
-    extra
+    extra,
+    createCase = true,
+    existingCaseNumber = null
 }) {
     if (!guild) {
         console.error('logAction requires a guild.');
@@ -34,19 +36,15 @@ module.exports = async function logAction({
 
     const targetTag =
         targetUser?.tag ||
-        (targetUser?.username ? `${targetUser.username}` : 'Unknown User');
+        (targetUser?.username ? `${targetUser.username}` : (targetId ? 'Unknown User' : 'No target user'));
 
     const moderatorTag =
         modUser?.tag ||
         (modUser?.username ? `${modUser.username}` : 'Unknown Moderator');
 
-    let caseNumber = null;
+    let caseNumber = existingCaseNumber;
     let logChannelId = null;
 
-    // ==================================================
-    // DATABASE: ENSURE SETTINGS ROW, GET NEXT CASE FROM CASES TABLE,
-    // UPDATE SETTINGS, INSERT CASE
-    // ==================================================
     let connection;
 
     try {
@@ -72,38 +70,40 @@ module.exports = async function logAction({
         const settings = settingsRows[0] || {};
         logChannelId = settings.mod_logs || null;
 
-        const [caseRows] = await connection.query(
-            `SELECT COALESCE(MAX(case_number), 0) AS lastCase
-             FROM cases
-             WHERE guild_id = ?
-             FOR UPDATE`,
-            [guildId]
-        );
+        if (createCase) {
+            const [caseRows] = await connection.query(
+                `SELECT COALESCE(MAX(case_number), 0) AS lastCase
+                 FROM cases
+                 WHERE guild_id = ?
+                 FOR UPDATE`,
+                [guildId]
+            );
 
-        const lastCaseNumber = Number(caseRows[0]?.lastCase || 0);
-        caseNumber = lastCaseNumber + 1;
+            const lastCaseNumber = Number(caseRows[0]?.lastCase || 0);
+            caseNumber = lastCaseNumber + 1;
 
-        await connection.query(
-            `UPDATE guild_settings
-             SET case_number = ?
-             WHERE guild_id = ?`,
-            [caseNumber, guildId]
-        );
+            await connection.query(
+                `UPDATE guild_settings
+                 SET case_number = ?
+                 WHERE guild_id = ?`,
+                [caseNumber, guildId]
+            );
 
-        await connection.query(
-            `INSERT INTO cases
-             (guild_id, case_number, action, user_id, moderator_id, reason, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-                guildId,
-                caseNumber,
-                action || 'UNKNOWN',
-                targetId,
-                moderatorId,
-                reason || 'No reason provided',
-                createdAt
-            ]
-        );
+            await connection.query(
+                `INSERT INTO cases
+                 (guild_id, case_number, action, user_id, moderator_id, reason, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    guildId,
+                    caseNumber,
+                    action || 'UNKNOWN',
+                    targetId,
+                    moderatorId,
+                    reason || 'No reason provided',
+                    createdAt
+                ]
+            );
+        }
 
         await connection.commit();
     } catch (error) {
@@ -121,16 +121,14 @@ module.exports = async function logAction({
         if (connection) connection.release();
     }
 
-    // ==================================================
-    // IF NO LOG CHANNEL IS SET, STOP AFTER CASE INSERT
-    // ==================================================
     if (!logChannelId) {
-        return { caseNumber, logged: false, reason: 'No mod log channel configured' };
+        return {
+            caseNumber,
+            logged: false,
+            reason: 'No mod log channel configured'
+        };
     }
 
-    // ==================================================
-    // FETCH CHANNEL SAFELY
-    // ==================================================
     let channel = guild.channels.cache.get(logChannelId);
 
     if (!channel) {
@@ -156,9 +154,6 @@ module.exports = async function logAction({
         return { caseNumber, logged: false, reason: 'Invalid log channel type' };
     }
 
-    // ==================================================
-    // BOT PERMISSION CHECKS
-    // ==================================================
     const botMember = guild.members.me;
     const permissions = channel.permissionsFor(botMember);
 
@@ -180,9 +175,6 @@ module.exports = async function logAction({
         return { caseNumber, logged: false, reason: 'Missing channel permissions' };
     }
 
-    // ==================================================
-    // BUILD EMBED SAFELY
-    // ==================================================
     const embedFields = [
         {
             name: '👤 Target',
@@ -219,20 +211,25 @@ module.exports = async function logAction({
         inline: false
     });
 
+    const title = caseNumber
+        ? `${action || 'UNKNOWN'} • Case #${caseNumber}`
+        : `${action || 'UNKNOWN'}`;
+
+    const footerText = caseNumber
+        ? `Case #${caseNumber} • Infinity Moderation`
+        : 'Infinity Moderation';
+
     const embed = new EmbedBuilder()
-        .setTitle(`${action || 'UNKNOWN'} • Case #${caseNumber}`)
+        .setTitle(title)
         .setColor(color || '#00bfff')
         .setThumbnail(targetUser?.displayAvatarURL?.({ dynamic: true }) || null)
         .addFields(embedFields)
         .setFooter({
-            text: `Case #${caseNumber} • Infinity Moderation`,
+            text: footerText,
             iconURL: guild.iconURL() || null
         })
         .setTimestamp();
 
-    // ==================================================
-    // SEND LOG SAFELY
-    // ==================================================
     try {
         await channel.send({ embeds: [embed] });
         return { caseNumber, logged: true };
