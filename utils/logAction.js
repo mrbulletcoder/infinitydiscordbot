@@ -23,7 +23,9 @@ module.exports = async function logAction({
     const guildId = guild.id;
     const createdAt = Math.floor(Date.now() / 1000);
 
-    // ===== NORMALIZE USER / MODERATOR =====
+    // ==================================================
+    // NORMALIZE USER / MODERATOR
+    // ==================================================
     const targetUser = user?.user || user || null;
     const modUser = moderator?.user || moderator || null;
 
@@ -42,7 +44,8 @@ module.exports = async function logAction({
     let logChannelId = null;
 
     // ==================================================
-    // DATABASE: CREATE SETTINGS ROW, INCREMENT CASE, INSERT CASE
+    // DATABASE: ENSURE SETTINGS ROW, GET NEXT CASE FROM CASES TABLE,
+    // UPDATE SETTINGS, INSERT CASE
     // ==================================================
     let connection;
 
@@ -51,14 +54,14 @@ module.exports = async function logAction({
         await connection.beginTransaction();
 
         await connection.query(
-            `INSERT INTO guild_settings (guild_id)
-             VALUES (?)
+            `INSERT INTO guild_settings (guild_id, case_number)
+             VALUES (?, 0)
              ON DUPLICATE KEY UPDATE guild_id = guild_id`,
             [guildId]
         );
 
-        const [rows] = await connection.query(
-            `SELECT case_number, mod_logs
+        const [settingsRows] = await connection.query(
+            `SELECT mod_logs
              FROM guild_settings
              WHERE guild_id = ?
              LIMIT 1
@@ -66,9 +69,19 @@ module.exports = async function logAction({
             [guildId]
         );
 
-        const settings = rows[0] || {};
-        caseNumber = Number(settings.case_number || 0) + 1;
+        const settings = settingsRows[0] || {};
         logChannelId = settings.mod_logs || null;
+
+        const [caseRows] = await connection.query(
+            `SELECT COALESCE(MAX(case_number), 0) AS lastCase
+             FROM cases
+             WHERE guild_id = ?
+             FOR UPDATE`,
+            [guildId]
+        );
+
+        const lastCaseNumber = Number(caseRows[0]?.lastCase || 0);
+        caseNumber = lastCaseNumber + 1;
 
         await connection.query(
             `UPDATE guild_settings
@@ -133,7 +146,6 @@ module.exports = async function logAction({
         return { caseNumber, logged: false, reason: 'Log channel not found' };
     }
 
-    // Must be a text-capable guild channel
     const allowedChannelTypes = new Set([
         ChannelType.GuildText,
         ChannelType.GuildAnnouncement
