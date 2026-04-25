@@ -1,4 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    EmbedBuilder,
+    PermissionFlagsBits,
+    MessageFlags
+} = require('discord.js');
+
 const logAction = require('../../utils/logAction');
 const {
     checkPrefixHierarchy,
@@ -8,6 +14,36 @@ const {
     getWarnings,
     deleteWarningById
 } = require('../../utils/moderationDb');
+
+const UNWARN_COLOR = '#57f287';
+
+function formatUser(user) {
+    return `${user.tag || user.username}\n\`${user.id}\``;
+}
+
+function getCaseNumber(logResult) {
+    if (!logResult) return null;
+    if (typeof logResult === 'number') return logResult;
+    return logResult.caseNumber || logResult.case_number || null;
+}
+
+function buildUnwarnEmbed({ user, moderator, warningNumber, warningId, removedReason, remainingWarnings, guild, caseNumber = null }) {
+    return new EmbedBuilder()
+        .setAuthor({ name: 'Infinity • Warning System', iconURL: user.displayAvatarURL({ dynamic: true }) })
+        .setTitle('⚠️ Warning Removed')
+        .setColor(UNWARN_COLOR)
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .addFields(
+            { name: '👤 Member', value: formatUser(user), inline: true },
+            { name: '🛡️ Moderator', value: formatUser(moderator), inline: true },
+            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`', inline: true },
+            { name: '🧾 Removed Warning', value: `Position: **#${warningNumber}**\nDatabase ID: \`${warningId}\``, inline: true },
+            { name: '📊 Remaining', value: `**${remainingWarnings}** warning${remainingWarnings === 1 ? '' : 's'}`, inline: true },
+            { name: '📄 Original Reason', value: `> ${removedReason}`, inline: false }
+        )
+        .setFooter({ text: `${guild.name} • Moderation` })
+        .setTimestamp();
+}
 
 module.exports = {
     name: 'unwarn',
@@ -38,189 +74,95 @@ module.exports = {
     async executePrefix(message, args) {
         const targetMember = message.mentions.members.first();
         const targetUser = message.mentions.users.first();
+        const warningNumber = Number.parseInt(args[1], 10);
 
-        if (!targetUser || !targetMember) {
-            return message.reply('❌ Mention a user.');
-        }
-
-        if (targetUser.bot) {
-            return message.reply('❌ You cannot unwarn bots.');
-        }
-
-        if (!(await checkPrefixHierarchy(message, targetMember))) return;
-
-        const warningNumber = parseInt(args[1], 10);
-        if (!warningNumber || warningNumber < 1) {
+        if (!targetUser || !targetMember) return message.reply('❌ Mention a user.');
+        if (targetUser.bot) return message.reply('❌ You cannot unwarn bots.');
+        if (!Number.isInteger(warningNumber) || warningNumber < 1) {
             return message.reply('❌ Provide a valid warning number. Example: `!unwarn @user 1`');
         }
+        if (!(await checkPrefixHierarchy(message, targetMember))) return;
 
-        await removeWarning({
+        return removeWarning({
+            client: message.client,
             guild: message.guild,
             targetUser,
             warningNumber,
             moderator: message.author,
-            client: message.client,
-            replyTarget: message,
-            isSlash: false
+            reply: payload => message.reply(payload)
         });
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const warningNumber = interaction.options.getInteger('warning', true);
 
-        if (!targetMember) {
-            return interaction.editReply({
-                content: '❌ User not found in this server.',
-                ephemeral: true
-            });
-        }
-
-        if (targetUser.bot) {
-            return interaction.editReply({
-                content: '❌ You cannot unwarn bots.',
-                ephemeral: true
-            });
-        }
-
+        if (!targetMember) return interaction.editReply({ content: '❌ User not found in this server.' });
+        if (targetUser.bot) return interaction.editReply({ content: '❌ You cannot unwarn bots.' });
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
 
-        await removeWarning({
+        return removeWarning({
+            client: interaction.client,
             guild: interaction.guild,
             targetUser,
             warningNumber,
             moderator: interaction.user,
-            client: interaction.client,
-            replyTarget: interaction,
-            isSlash: true
+            reply: payload => interaction.editReply(payload)
         });
     }
 };
 
-async function removeWarning({
-    guild,
-    targetUser,
-    warningNumber,
-    moderator,
-    client,
-    replyTarget,
-    isSlash
-}) {
+async function removeWarning({ client, guild, targetUser, warningNumber, moderator, reply }) {
     try {
         const result = await getWarnings(guild.id, targetUser.id);
+        if (!result.ok) return reply({ content: '❌ Failed to fetch warnings.' });
 
-        if (!result.ok) {
-            if (isSlash) {
-                return replyTarget.editReply({
-                    content: '❌ Failed to fetch warnings.'
-                });
-            }
-
-            return replyTarget.editReply('❌ Failed to fetch warnings.');
-        }
-
-        const rows = result.rows;
-
-        if (!rows.length) {
-            if (isSlash) {
-                return replyTarget.editReply({
-                    content: '❌ That user has no warnings.'
-                });
-            }
-
-            return replyTarget.editReply('❌ That user has no warnings.');
-        }
-
+        const rows = result.rows || [];
+        if (!rows.length) return reply({ content: '❌ That user has no warnings.' });
         if (warningNumber > rows.length) {
-            const content = `❌ Invalid warning number. That user only has **${rows.length}** warning(s).`;
-
-            if (isSlash) {
-                return replyTarget.editReply({ content });
-            }
-
-            return replyTarget.editReply(content);
+            return reply({ content: `❌ Invalid warning number. That user only has **${rows.length}** warning(s).` });
         }
 
         const warning = rows[warningNumber - 1];
+        const removedReason = warning.reason || 'No reason provided';
 
         const deleteResult = await deleteWarningById(warning.id);
-        if (!deleteResult.ok) {
-            if (isSlash) {
-                return replyTarget.editReply({
-                    content: '❌ Failed to remove warning.'
-                });
-            }
-
-            return replyTarget.editReply('❌ Failed to remove warning.');
-        }
+        if (!deleteResult.ok) return reply({ content: '❌ Failed to remove warning.' });
 
         const remainingWarnings = rows.length - 1;
-
-        await logAction({
+        const logResult = await logAction({
             client,
             guild,
             action: '⚠️ Unwarn',
             user: targetUser,
             moderator,
-            reason: warning.reason || 'No reason provided',
-            color: '#00ff88',
-            extra: `Removed Warning #${warningNumber} • Remaining: ${remainingWarnings}`
+            reason: `Removed warning #${warningNumber}: ${removedReason}`,
+            color: UNWARN_COLOR,
+            extra: [
+                `**Removed Warning Position:** #${warningNumber}`,
+                `**Warning Database ID:** \`${warning.id}\``,
+                `**Remaining Warnings:** ${remainingWarnings}`,
+                `**Original Reason:** ${removedReason}`
+            ].join('\n')
         });
 
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '⚠️ Warning Removed',
-                iconURL: targetUser.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#00ff88')
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${targetUser.tag}\n\`${targetUser.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${moderator.tag}\n\`${moderator.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🔢 Removed',
-                    value: `Warning #${warningNumber}`,
-                    inline: true
-                },
-                {
-                    name: '📊 Remaining',
-                    value: `**${remainingWarnings}**`,
-                    inline: true
-                },
-                {
-                    name: '📄 Reason',
-                    value: `> ${warning.reason || 'No reason provided'}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Warnings System' })
-            .setTimestamp();
-
-        if (isSlash) {
-            return replyTarget.editReply({ embeds: [embed] });
-        }
-
-        return replyTarget.editReply({ embeds: [embed] });
+        return reply({
+            embeds: [buildUnwarnEmbed({
+                user: targetUser,
+                moderator,
+                warningNumber,
+                warningId: warning.id,
+                removedReason,
+                remainingWarnings,
+                guild,
+                caseNumber: getCaseNumber(logResult)
+            })]
+        });
     } catch (error) {
         console.error('Unwarn Command Error:', error);
-
-        if (isSlash) {
-            return replyTarget.editReply({
-                content: '❌ Error removing warning.'
-            }).catch(() => null);
-        }
-
-        return replyTarget.editReply('❌ Error removing warning.').catch(() => null);
+        return reply({ content: '❌ Error removing warning.' }).catch(() => null);
     }
 }

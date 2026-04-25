@@ -138,51 +138,95 @@ function formatCooldown(ms) {
     return `${seconds}s`;
 }
 
+function getCleanCategoryTitle(name) {
+    return String(name || 'Reaction Roles')
+        .replace(/^\s*[🎮🎭🎯✨⭐🌟🔥💎👑🛡️⚔️🎨🎵🎬📢📌✅🔔💬🌈🚀🧩]\s*/u, '')
+        .trim() || 'Reaction Roles';
+}
+
+function trimEmbedText(value, max = 1024) {
+    const text = String(value || '');
+    return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+function chunkEmbedLines(lines, max = 950) {
+    const chunks = [];
+    let current = '';
+
+    for (const line of lines) {
+        const next = current ? `${current}\n${line}` : line;
+
+        if (next.length > max && current) {
+            chunks.push(current);
+            current = line;
+        } else {
+            current = next;
+        }
+    }
+
+    if (current) chunks.push(current);
+    return chunks;
+}
+
 function buildReactionRoleEmbed(category, items, guildName = 'Infinity') {
     const mode = category.mode || category.category_mode || 'multi';
     const name = category.name || category.category_name || 'Reaction Roles';
     const description =
         category.description ||
         category.category_description ||
-        'React below to choose your role.';
+        'Choose your roles below.';
 
     const isSingle = mode === 'single';
 
     const roleList = items.length
-        ? items.map(item => {
-            const label = item.label ? ` • *${item.label}*` : '';
-            return `> ${item.emoji_display} **<@&${item.role_id}>**${label}`;
-        }).join('\n')
-        : '*No roles configured yet.*';
+        ? items.map((item, index) => {
+            const number = String(index + 1).padStart(2, '0');
+            const label = item.label || 'Role';
+            return [
+                `**${number}.** ${item.emoji_display} <@&${item.role_id}>`,
+                `> ${label}`
+            ].join('\n');
+        }).join('\n\n')
+        : '> No roles configured yet.';
 
     return {
         author: {
-            name: `${guildName} • Self Roles`
+            name: `${guildName} • Infinity Role Panel`
         },
 
-        title: `🎮 ${name}`,
+        title: `✦ ${name}`,
 
         description: [
-            `**${description}**`,
+            `> ${description}`,
             '',
             isSingle
-                ? '> 🎯 **Select one role**'
-                : '> ✨ **Select your roles below**',
-            '> 🔁 Remove your reaction to remove them'
+                ? '```ansi\nSelect one role from the options below\n```'
+                : '```ansi\nSelect any roles you want from the options below\n```'
         ].join('\n'),
 
         color: 0x00bfff,
 
         fields: [
             {
-                name: '🎭 Roles',
+                name: '╭─ Available Roles',
                 value: roleList,
+                inline: false
+            },
+            {
+                name: '╰─ How It Works',
+                value: [
+                    isSingle
+                        ? '🎯 **Single Select:** only one role can be active from this panel.'
+                        : '✨ **Multi Select:** choose as many roles as you want.',
+                    '🔁 **Remove:** remove your reaction to remove the role.',
+                    '⚡ **Instant:** role changes apply automatically.'
+                ].join('\n'),
                 inline: false
             }
         ],
 
         footer: {
-            text: `${guildName} • Reaction Roles`
+            text: `${guildName} • ${isSingle ? 'Single Select' : 'Multi Select'} • ${items.length} role${items.length === 1 ? '' : 's'}`
         },
 
         timestamp: new Date().toISOString()

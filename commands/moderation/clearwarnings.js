@@ -1,9 +1,47 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const {
+    SlashCommandBuilder,
+    EmbedBuilder,
+    PermissionFlagsBits,
+    MessageFlags
+} = require('discord.js');
+
+const logAction = require('../../utils/logAction');
 const {
     checkPrefixHierarchy,
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
-const { clearWarnings } = require('../../utils/moderationDb');
+const {
+    getWarnings,
+    clearWarnings
+} = require('../../utils/moderationDb');
+
+const CLEAR_WARNINGS_COLOR = '#57f287';
+
+function formatUser(user) {
+    return `${user.tag || user.username}\n\`${user.id}\``;
+}
+
+function getCaseNumber(logResult) {
+    if (!logResult) return null;
+    if (typeof logResult === 'number') return logResult;
+    return logResult.caseNumber || logResult.case_number || null;
+}
+
+function buildClearWarningsEmbed({ user, moderator, clearedCount, guild, caseNumber = null }) {
+    return new EmbedBuilder()
+        .setAuthor({ name: 'Infinity • Warning System', iconURL: user.displayAvatarURL({ dynamic: true }) })
+        .setTitle('🧽 Warnings Cleared')
+        .setColor(CLEAR_WARNINGS_COLOR)
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .addFields(
+            { name: '👤 Member', value: formatUser(user), inline: true },
+            { name: '🛡️ Moderator', value: formatUser(moderator), inline: true },
+            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`', inline: true },
+            { name: '🧾 Cleared', value: `**${clearedCount}** warning${clearedCount === 1 ? '' : 's'}`, inline: true }
+        )
+        .setFooter({ text: `${guild.name} • Moderation` })
+        .setTimestamp();
+}
 
 module.exports = {
     name: 'clearwarnings',
@@ -15,107 +53,85 @@ module.exports = {
 
     slashData: new SlashCommandBuilder()
         .setName('clearwarnings')
-        .setDescription('Clear warnings')
+        .setDescription('Clear all warnings for a user')
         .addUserOption(option =>
-            option.setName('user').setDescription('User').setRequired(true))
+            option
+                .setName('user')
+                .setDescription('User to clear warnings for')
+                .setRequired(true)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executePrefix(message) {
         const targetMember = message.mentions.members.first();
         const targetUser = message.mentions.users.first();
 
-        if (!targetUser || !targetMember) {
-            return message.reply('❌ Mention a user.');
-        }
-
-        if (targetUser.bot) {
-            return message.reply('❌ You cannot clear warnings for bots.');
-        }
-
+        if (!targetUser || !targetMember) return message.reply('❌ Mention a user.');
+        if (targetUser.bot) return message.reply('❌ You cannot clear warnings for bots.');
         if (!(await checkPrefixHierarchy(message, targetMember))) return;
 
-        const result = await clearWarnings(message.guild.id, targetUser.id);
-        if (!result.ok) {
-            return message.reply('❌ Failed to clear warnings.');
-        }
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '🧽 Warnings Cleared',
-                iconURL: targetUser.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#00ff88')
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${targetUser.tag}\n\`${targetUser.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${message.author.tag}\n\`${message.author.id}\``,
-                    inline: true
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Warnings System' })
-            .setTimestamp();
-
-        return message.reply({ embeds: [embed] });
+        return runClearWarnings({
+            client: message.client,
+            guild: message.guild,
+            targetUser,
+            moderator: message.author,
+            reply: payload => message.reply(payload)
+        });
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-        
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        if (!targetMember) {
-            return interaction.editReply({
-                content: '❌ User not found in this server.',
-                ephemeral: true
-            });
-        }
-
-        if (targetUser.bot) {
-            return interaction.editReply({
-                content: '❌ You cannot clear warnings for bots.',
-                ephemeral: true
-            });
-        }
-
+        if (!targetMember) return interaction.editReply({ content: '❌ User not found in this server.' });
+        if (targetUser.bot) return interaction.editReply({ content: '❌ You cannot clear warnings for bots.' });
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
 
-        const result = await clearWarnings(interaction.guild.id, targetUser.id);
-        if (!result.ok) {
-            return interaction.editReply({
-                content: '❌ Failed to clear warnings.',
-                ephemeral: true
-            });
-        }
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: '🧽 Warnings Cleared',
-                iconURL: targetUser.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#00ff88')
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                {
-                    name: '👤 User',
-                    value: `${targetUser.tag}\n\`${targetUser.id}\``,
-                    inline: true
-                },
-                {
-                    name: '🛡️ Moderator',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                }
-            )
-            .setFooter({ text: 'Infinity Moderation • Warnings System' })
-            .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
+        return runClearWarnings({
+            client: interaction.client,
+            guild: interaction.guild,
+            targetUser,
+            moderator: interaction.user,
+            reply: payload => interaction.editReply(payload)
+        });
     }
 };
+
+async function runClearWarnings({ client, guild, targetUser, moderator, reply }) {
+    try {
+        const before = await getWarnings(guild.id, targetUser.id);
+        if (!before.ok) return reply({ content: '❌ Failed to fetch warnings.' });
+
+        const clearedCount = before.rows?.length || 0;
+        if (!clearedCount) return reply({ content: '❌ That user has no warnings to clear.' });
+
+        const result = await clearWarnings(guild.id, targetUser.id);
+        if (!result.ok) return reply({ content: '❌ Failed to clear warnings.' });
+
+        const logResult = await logAction({
+            client,
+            guild,
+            action: '🧽 Clear Warnings',
+            user: targetUser,
+            moderator,
+            reason: `Cleared ${clearedCount} warning${clearedCount === 1 ? '' : 's'}`,
+            color: CLEAR_WARNINGS_COLOR,
+            extra: `**Warnings Cleared:** ${clearedCount}`
+        });
+
+        return reply({
+            embeds: [buildClearWarningsEmbed({
+                user: targetUser,
+                moderator,
+                clearedCount,
+                guild,
+                caseNumber: getCaseNumber(logResult)
+            })]
+        });
+    } catch (error) {
+        console.error('Clearwarnings Command Error:', error);
+        return reply({ content: '❌ Failed to clear warnings.' }).catch(() => null);
+    }
+}

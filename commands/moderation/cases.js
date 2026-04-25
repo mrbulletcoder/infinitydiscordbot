@@ -1,7 +1,8 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    MessageFlags
 } = require('discord.js');
 
 const {
@@ -11,30 +12,71 @@ const {
     getCasesByAction
 } = require('../../utils/moderationDb');
 
-function trimReason(reason, max = 80) {
-    const text = String(reason || 'No reason provided');
+const BRAND_COLOR = '#00bfff';
+const ERROR_COLOR = '#ff4d4d';
+
+function trimText(value, max = 120) {
+    const text = String(value || 'No reason provided');
     return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
 
-function buildCasesEmbed(title, iconURL, rows, modeLabel) {
+function toUnixTimestamp(value) {
+    const number = Number(value);
+    if (!number) return Math.floor(Date.now() / 1000);
+    return number > 9999999999 ? Math.floor(number / 1000) : number;
+}
+
+function errorEmbed(description) {
+    return new EmbedBuilder()
+        .setColor(ERROR_COLOR)
+        .setDescription(`❌ ${description}`)
+        .setTimestamp();
+}
+
+async function safeDefer(interaction) {
+    if (interaction.deferred || interaction.replied) return true;
+
+    try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        return true;
+    } catch (error) {
+        if (error.code === 10062) {
+            console.error('Cases command interaction expired before deferReply.');
+            return false;
+        }
+
+        throw error;
+    }
+}
+
+function buildCasesEmbed({ title, iconURL, rows, modeLabel, guild }) {
     const description = rows
-        .map(row =>
-            `**#${row.case_number}** • ${row.action}\n` +
-            `> ${trimReason(row.reason)}\n` +
-            `• User: ${row.user_id ? `<@${row.user_id}>` : 'Unknown'}\n` +
-            `• Moderator: ${row.moderator_id ? `<@${row.moderator_id}>` : 'Unknown'}\n` +
-            `• <t:${row.created_at}:R>`
-        )
+        .map(row => {
+            const createdAt = toUnixTimestamp(row.created_at);
+
+            return [
+                `### 📁 Case #${row.case_number}`,
+                `**Action:** ${row.action || 'Unknown'}`,
+                `**User:** ${row.user_id ? `<@${row.user_id}>` : 'Unknown'}  •  **Moderator:** ${row.moderator_id ? `<@${row.moderator_id}>` : 'Unknown'}`,
+                `**Reason:** ${trimText(row.reason, 180)}`,
+                `**Created:** <t:${createdAt}:R>`
+            ].join('\n');
+        })
         .join('\n\n')
         .slice(0, 4096);
 
     return new EmbedBuilder()
+        .setColor(BRAND_COLOR)
         .setAuthor({
             name: title,
-            iconURL: iconURL || null
+            iconURL: iconURL || guild.iconURL({ dynamic: true }) || undefined
         })
-        .setColor('#00bfff')
-        .setDescription(description || 'No cases found.')
+        .setDescription(description || '> No cases found.')
+        .addFields({
+            name: '📊 Results',
+            value: `Showing **${rows.length}** case${rows.length === 1 ? '' : 's'}. Use \`/case number:<id>\` for full details.`,
+            inline: false
+        })
         .setFooter({ text: `Infinity Moderation • ${modeLabel}` })
         .setTimestamp();
 }
@@ -65,13 +107,21 @@ module.exports = {
         .addStringOption(option =>
             option
                 .setName('action')
-                .setDescription('Filter by action (ban, warn, timeout, kick)')
+                .setDescription('Filter by action')
                 .setRequired(false)
                 .addChoices(
                     { name: 'Ban', value: 'Ban' },
                     { name: 'Kick', value: 'Kick' },
                     { name: 'Timeout', value: 'Timeout' },
-                    { name: 'Warn', value: 'Warn' }
+                    { name: 'Untimeout', value: 'Untimeout' },
+                    { name: 'Warn', value: 'Warn' },
+                    { name: 'Unwarn', value: 'Unwarn' },
+                    { name: 'Clear Warnings', value: 'Clear Warnings' },
+                    { name: 'Clear Messages', value: 'Clear' },
+                    { name: 'Lock', value: 'Lock' },
+                    { name: 'Unlock', value: 'Unlock' },
+                    { name: 'Slowmode', value: 'Slowmode' },
+                    { name: 'Unban', value: 'Unban' }
                 )
         )
         .addBooleanOption(option =>
@@ -83,7 +133,7 @@ module.exports = {
         .addIntegerOption(option =>
             option
                 .setName('limit')
-                .setDescription('How many cases to show (1-25)')
+                .setDescription('How many cases to show')
                 .setMinValue(1)
                 .setMaxValue(25)
                 .setRequired(false)
@@ -91,7 +141,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        const deferred = await safeDefer(interaction);
+        if (!deferred) return;
 
         const targetUser = interaction.options.getUser('user');
         const targetModerator = interaction.options.getUser('moderator');
@@ -103,13 +154,13 @@ module.exports = {
 
         if (filtersUsed === 0) {
             return interaction.editReply({
-                content: '❌ Choose one filter: user, moderator, action, or recent.'
+                embeds: [errorEmbed('Choose one filter: user, moderator, action, or recent.')]
             });
         }
 
         if (filtersUsed > 1) {
             return interaction.editReply({
-                content: '❌ Use only one filter at a time.'
+                embeds: [errorEmbed('Use only one filter at a time.')]
             });
         }
 
@@ -120,70 +171,90 @@ module.exports = {
             result = await getCasesForUser(interaction.guild.id, targetUser.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({ content: '❌ Failed to fetch case history.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('Failed to fetch case history.')]
+                });
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({ content: '❌ No case history found for that user.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('No case history found for that user.')]
+                });
             }
 
-            embed = buildCasesEmbed(
-                `📁 ${targetUser.tag} • Case History`,
-                targetUser.displayAvatarURL({ dynamic: true }),
-                result.rows,
-                `User Cases • Showing ${result.rows.length}`
-            );
+            embed = buildCasesEmbed({
+                title: `📁 ${targetUser.tag} • Case History`,
+                iconURL: targetUser.displayAvatarURL({ dynamic: true }),
+                rows: result.rows,
+                modeLabel: `User Cases • Showing ${result.rows.length}`,
+                guild: interaction.guild
+            });
         } else if (targetModerator) {
             result = await getCasesByModerator(interaction.guild.id, targetModerator.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({ content: '❌ Failed to fetch moderator cases.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('Failed to fetch moderator cases.')]
+                });
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({ content: '❌ No cases found for that moderator.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('No cases found for that moderator.')]
+                });
             }
 
-            embed = buildCasesEmbed(
-                `🛡️ ${targetModerator.tag} • Moderator Cases`,
-                targetModerator.displayAvatarURL({ dynamic: true }),
-                result.rows,
-                `Moderator Cases • Showing ${result.rows.length}`
-            );
+            embed = buildCasesEmbed({
+                title: `🛡️ ${targetModerator.tag} • Moderator Cases`,
+                iconURL: targetModerator.displayAvatarURL({ dynamic: true }),
+                rows: result.rows,
+                modeLabel: `Moderator Cases • Showing ${result.rows.length}`,
+                guild: interaction.guild
+            });
         } else if (action) {
             result = await getCasesByAction(interaction.guild.id, action, limit);
 
             if (!result.ok) {
-                return interaction.editReply({ content: '❌ Failed to fetch action-filtered cases.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('Failed to fetch action-filtered cases.')]
+                });
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({ content: `❌ No ${action.toLowerCase()} cases found.` });
+                return interaction.editReply({
+                    embeds: [errorEmbed(`No ${action.toLowerCase()} cases found.`)]
+                });
             }
 
-            embed = buildCasesEmbed(
-                `⚖️ ${action} • Server Cases`,
-                interaction.guild.iconURL({ dynamic: true }),
-                result.rows,
-                `${action} Cases • Showing ${result.rows.length}`
-            );
-        } else if (recent) {
+            embed = buildCasesEmbed({
+                title: `⚖️ ${action} • Server Cases`,
+                iconURL: interaction.guild.iconURL({ dynamic: true }),
+                rows: result.rows,
+                modeLabel: `${action} Cases • Showing ${result.rows.length}`,
+                guild: interaction.guild
+            });
+        } else {
             result = await getRecentCases(interaction.guild.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({ content: '❌ Failed to fetch recent cases.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('Failed to fetch recent cases.')]
+                });
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({ content: '❌ No recent cases found.' });
+                return interaction.editReply({
+                    embeds: [errorEmbed('No recent cases found.')]
+                });
             }
 
-            embed = buildCasesEmbed(
-                `🕒 Recent Cases • ${interaction.guild.name}`,
-                interaction.guild.iconURL({ dynamic: true }),
-                result.rows,
-                `Recent Cases • Showing ${result.rows.length}`
-            );
+            embed = buildCasesEmbed({
+                title: `🕒 Recent Cases • ${interaction.guild.name}`,
+                iconURL: interaction.guild.iconURL({ dynamic: true }),
+                rows: result.rows,
+                modeLabel: `Recent Cases • Showing ${result.rows.length}`,
+                guild: interaction.guild
+            });
         }
 
         return interaction.editReply({ embeds: [embed] });

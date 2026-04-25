@@ -1,9 +1,23 @@
 const { pool } = require('../database');
-const {
-    EmbedBuilder,
-    PermissionFlagsBits,
-    ChannelType
-} = require('discord.js');
+const { sendAdvancedLog } = require('./advancedLogger');
+
+function normaliseUser(value) {
+    return value?.user || value || null;
+}
+
+function getUserTag(user, fallback = 'Unknown') {
+    if (!user) return fallback;
+    return user.tag || user.username || fallback;
+}
+
+function formatUser(user, emptyText = 'Unknown') {
+    if (!user?.id) return emptyText;
+    return `${getUserTag(user)}\n\`${user.id}\``;
+}
+
+function cleanActionName(action = 'UNKNOWN') {
+    return String(action || 'UNKNOWN').replace(/^[^\w#]+\s*/u, '').trim() || 'UNKNOWN';
+}
 
 module.exports = async function logAction({
     client,
@@ -25,26 +39,17 @@ module.exports = async function logAction({
     const guildId = guild.id;
     const createdAt = Math.floor(Date.now() / 1000);
 
-    // ==================================================
-    // NORMALIZE USER / MODERATOR
-    // ==================================================
-    const targetUser = user?.user || user || null;
-    const modUser = moderator?.user || moderator || null;
+    const targetUser = normaliseUser(user);
+    const modUser = normaliseUser(moderator);
 
     const targetId = targetUser?.id || null;
     const moderatorId = modUser?.id || null;
 
-    const targetTag =
-        targetUser?.tag ||
-        (targetUser?.username ? `${targetUser.username}` : (targetId ? 'Unknown User' : 'No target user'));
-
-    const moderatorTag =
-        modUser?.tag ||
-        (modUser?.username ? `${modUser.username}` : 'Unknown Moderator');
-
     let caseNumber = existingCaseNumber;
-    let logChannelId = null;
 
+    // ==================================================
+    // DATABASE: KEEP CASE SYSTEM IN logAction
+    // ==================================================
     let connection;
 
     try {
@@ -58,18 +63,6 @@ module.exports = async function logAction({
             [guildId]
         );
 
-        const [settingsRows] = await connection.query(
-            `SELECT mod_logs
-             FROM guild_settings
-             WHERE guild_id = ?
-             LIMIT 1
-             FOR UPDATE`,
-            [guildId]
-        );
-
-        const settings = settingsRows[0] || {};
-        logChannelId = settings.mod_logs || null;
-
         if (createCase) {
             const [caseRows] = await connection.query(
                 `SELECT COALESCE(MAX(case_number), 0) AS lastCase
@@ -79,8 +72,7 @@ module.exports = async function logAction({
                 [guildId]
             );
 
-            const lastCaseNumber = Number(caseRows[0]?.lastCase || 0);
-            caseNumber = lastCaseNumber + 1;
+            caseNumber = Number(caseRows[0]?.lastCase || 0) + 1;
 
             await connection.query(
                 `UPDATE guild_settings
@@ -121,120 +113,61 @@ module.exports = async function logAction({
         if (connection) connection.release();
     }
 
-    if (!logChannelId) {
-        return {
+    // ==================================================
+    // SEND THROUGH ADVANCED LOGGER
+    // No more old guild_settings.mod_logs channel fetch.
+    // /logging setup controls the moderation log channel now.
+    // ==================================================
+    const actionName = cleanActionName(action);
+    const logged = await sendAdvancedLog(guild, 'moderation', {
+        color: color || '#00bfff',
+        title: caseNumber ? `${action || 'Moderation Action'} • Case #${caseNumber}` : `${action || 'Moderation Action'}`,
+        description: 'A moderation action was recorded by Infinity.',
+        thumbnail: targetUser?.displayAvatarURL?.({ dynamic: true }) || null,
+        fields: [
+            {
+                name: '👤 Target',
+                value: formatUser(targetUser, 'No target user'),
+                inline: true
+            },
+            {
+                name: '🛡️ Moderator',
+                value: formatUser(modUser, 'Unknown Moderator'),
+                inline: true
+            },
+            {
+                name: '📁 Case',
+                value: caseNumber ? `\`#${caseNumber}\`` : '`No case created`',
+                inline: true
+            },
+            {
+                name: '📄 Reason',
+                value: reason || 'No reason provided',
+                inline: false
+            },
+            ...(extra ? [{
+                name: '📌 Extra',
+                value: String(extra).slice(0, 1024),
+                inline: false
+            }] : []),
+            {
+                name: '📅 Date',
+                value: `<t:${createdAt}:F>\n<t:${createdAt}:R>`,
+                inline: false
+            }
+        ],
+        metadata: {
+            type: 'moderation',
+            action: actionName,
             caseNumber,
-            logged: false,
-            reason: 'No mod log channel configured'
-        };
-    }
-
-    let channel = guild.channels.cache.get(logChannelId);
-
-    if (!channel) {
-        try {
-            channel = await guild.channels.fetch(logChannelId);
-        } catch (error) {
-            console.error(`logAction could not fetch log channel ${logChannelId}:`, error);
-            return { caseNumber, logged: false, reason: 'Failed to fetch log channel' };
+            targetId,
+            moderatorId
         }
-    }
-
-    if (!channel) {
-        return { caseNumber, logged: false, reason: 'Log channel not found' };
-    }
-
-    const allowedChannelTypes = new Set([
-        ChannelType.GuildText,
-        ChannelType.GuildAnnouncement
-    ]);
-
-    if (!allowedChannelTypes.has(channel.type)) {
-        console.error(`logAction channel ${logChannelId} is not a text/announcement channel.`);
-        return { caseNumber, logged: false, reason: 'Invalid log channel type' };
-    }
-
-    const botMember = guild.members.me;
-    const permissions = channel.permissionsFor(botMember);
-
-    if (!permissions) {
-        console.error(`logAction could not resolve bot permissions in channel ${logChannelId}.`);
-        return { caseNumber, logged: false, reason: 'Could not resolve bot permissions' };
-    }
-
-    const requiredPerms = [
-        PermissionFlagsBits.ViewChannel,
-        PermissionFlagsBits.SendMessages,
-        PermissionFlagsBits.EmbedLinks
-    ];
-
-    const missingPerms = requiredPerms.filter(perm => !permissions.has(perm));
-
-    if (missingPerms.length) {
-        console.error(`logAction missing permissions in channel ${logChannelId}:`, missingPerms);
-        return { caseNumber, logged: false, reason: 'Missing channel permissions' };
-    }
-
-    const embedFields = [
-        {
-            name: '👤 Target',
-            value: targetId
-                ? `${targetTag}\n\`${targetId}\``
-                : 'No target user',
-            inline: true
-        },
-        {
-            name: '🛡️ Moderator',
-            value: moderatorId
-                ? `${moderatorTag}\n\`${moderatorId}\``
-                : 'Unknown',
-            inline: true
-        },
-        {
-            name: '📄 Reason',
-            value: reason || 'No reason provided',
-            inline: false
-        }
-    ];
-
-    if (extra) {
-        embedFields.push({
-            name: '📌 Extra',
-            value: String(extra).slice(0, 1024),
-            inline: false
-        });
-    }
-
-    embedFields.push({
-        name: '📅 Date',
-        value: `<t:${createdAt}:F>`,
-        inline: false
     });
 
-    const title = caseNumber
-        ? `${action || 'UNKNOWN'} • Case #${caseNumber}`
-        : `${action || 'UNKNOWN'}`;
-
-    const footerText = caseNumber
-        ? `Case #${caseNumber} • Infinity Moderation`
-        : 'Infinity Moderation';
-
-    const embed = new EmbedBuilder()
-        .setTitle(title)
-        .setColor(color || '#00bfff')
-        .setThumbnail(targetUser?.displayAvatarURL?.({ dynamic: true }) || null)
-        .addFields(embedFields)
-        .setFooter({
-            text: footerText,
-            iconURL: guild.iconURL() || null
-        })
-        .setTimestamp();
-
-    try {
-        await channel.send({ embeds: [embed] });
-        return { caseNumber, logged: true };
-    } catch (error) {
-        console.error('logAction send error:', error);
-        return { caseNumber, logged: false, reason: 'Failed to send log embed' };
-    }
+    return {
+        caseNumber,
+        logged: Boolean(logged),
+        reason: logged ? undefined : 'No advanced moderation log channel configured or channel unavailable'
+    };
 };

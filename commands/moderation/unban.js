@@ -1,10 +1,64 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    MessageFlags
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
+
+const UNBAN_COLOR = '#57f287';
+
+function formatUser(user) {
+    return `${user.tag || user.username}\n\`${user.id}\``;
+}
+
+function getCaseNumber(logResult) {
+    if (!logResult) return null;
+    if (typeof logResult === 'number') return logResult;
+    return logResult.caseNumber || logResult.case_number || null;
+}
+
+function buildUnbanEmbed({ user, moderator, reason, guild, caseNumber = null }) {
+    return new EmbedBuilder()
+        .setAuthor({
+            name: 'Infinity • Ban System',
+            iconURL: user.displayAvatarURL({ dynamic: true })
+        })
+        .setTitle('🔓 Member Unbanned')
+        .setColor(UNBAN_COLOR)
+        .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+        .addFields(
+            { name: '👤 User', value: formatUser(user), inline: true },
+            { name: '🛡️ Moderator', value: formatUser(moderator), inline: true },
+            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`', inline: true },
+            { name: '📄 Reason', value: `> ${reason}`, inline: false }
+        )
+        .setFooter({ text: `${guild.name} • Moderation` })
+        .setTimestamp();
+}
+
+async function runUnban({ client, guild, userId, moderator, reason }) {
+    const ban = await guild.bans.fetch(userId).catch(() => null);
+    if (!ban) {
+        return { error: 'That user is not banned, or I could not find that ban.' };
+    }
+
+    const user = ban.user || await client.users.fetch(userId);
+    await guild.bans.remove(userId, reason);
+
+    const logResult = await logAction({
+        client,
+        guild,
+        action: '🔓 Unban',
+        user,
+        moderator,
+        reason,
+        color: UNBAN_COLOR
+    });
+
+    return { user, caseNumber: getCaseNumber(logResult) };
+}
 
 module.exports = {
     name: 'unban',
@@ -18,63 +72,47 @@ module.exports = {
         .setName('unban')
         .setDescription('Unban a user')
         .addStringOption(option =>
-            option.setName('userid')
+            option
+                .setName('userid')
                 .setDescription('User ID to unban')
-                .setRequired(true))
+                .setRequired(true)
+        )
         .addStringOption(option =>
-            option.setName('reason')
-                .setDescription('Reason for unban'))
+            option
+                .setName('reason')
+                .setDescription('Reason for unban')
+                .setMaxLength(1000)
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 
     async executePrefix(message, args) {
         const userId = args[0];
-        if (!userId) return message.reply('❌ Provide a user ID.');
-
         const reason = args.slice(1).join(' ') || 'No reason provided';
 
+        if (!/^\d{17,20}$/.test(userId || '')) {
+            return message.reply('❌ Provide a valid banned user ID.');
+        }
+
         try {
-            const user = await message.client.users.fetch(userId);
-
-            await message.guild.bans.remove(userId, reason);
-
-            await logAction({
+            const result = await runUnban({
                 client: message.client,
                 guild: message.guild,
-                action: '🔓 Unban',
-                user,
+                userId,
                 moderator: message.author,
-                reason,
-                color: '#00ff00'
+                reason
             });
 
-            const embed = new EmbedBuilder()
-                .setAuthor({
-                    name: '🔓 Unban Executed',
-                    iconURL: user.displayAvatarURL({ dynamic: true })
-                })
-                .setColor('#00ff88')
-                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .addFields(
-                    {
-                        name: '👤 User',
-                        value: `${user.tag}\n\`${user.id}\``,
-                        inline: true
-                    },
-                    {
-                        name: '🛡️ Moderator',
-                        value: `${message.author.tag}\n\`${message.author.id}\``,
-                        inline: true
-                    },
-                    {
-                        name: '📄 Reason',
-                        value: `> ${reason}`,
-                        inline: false
-                    }
-                )
-                .setFooter({ text: 'Infinity Moderation • Ban System' })
-                .setTimestamp();
+            if (result.error) return message.reply(`❌ ${result.error}`);
 
-            return message.reply({ embeds: [embed] });
+            return message.reply({
+                embeds: [buildUnbanEmbed({
+                    user: result.user,
+                    moderator: message.author,
+                    reason,
+                    guild: message.guild,
+                    caseNumber: result.caseNumber
+                })]
+            });
         } catch (error) {
             console.error('Unban Command Error:', error);
             return message.reply('❌ Failed to unban user.');
@@ -82,59 +120,38 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const userId = interaction.options.getString('userid');
+        const userId = interaction.options.getString('userid', true);
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        await interaction.deferReply({ ephemeral: true });
+        if (!/^\d{17,20}$/.test(userId)) {
+            return interaction.reply({ content: '❌ Provide a valid banned user ID.', flags: MessageFlags.Ephemeral });
+        }
+
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
-            const user = await interaction.client.users.fetch(userId);
-
-            await interaction.guild.bans.remove(userId, reason);
-
-            await logAction({
+            const result = await runUnban({
                 client: interaction.client,
                 guild: interaction.guild,
-                action: '🔓 Unban',
-                user,
+                userId,
                 moderator: interaction.user,
-                reason,
-                color: '#00ff00'
+                reason
             });
 
-            const embed = new EmbedBuilder()
-                .setAuthor({
-                    name: '🔓 Unban Executed',
-                    iconURL: user.displayAvatarURL({ dynamic: true })
-                })
-                .setColor('#00ff88')
-                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .addFields(
-                    {
-                        name: '👤 User',
-                        value: `${user.tag}\n\`${user.id}\``,
-                        inline: true
-                    },
-                    {
-                        name: '🛡️ Moderator',
-                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                        inline: true
-                    },
-                    {
-                        name: '📄 Reason',
-                        value: `> ${reason}`,
-                        inline: false
-                    }
-                )
-                .setFooter({ text: 'Infinity Moderation • Ban System' })
-                .setTimestamp();
+            if (result.error) return interaction.editReply({ content: `❌ ${result.error}` });
 
-            return interaction.editReply({ embeds: [embed] });
+            return interaction.editReply({
+                embeds: [buildUnbanEmbed({
+                    user: result.user,
+                    moderator: interaction.user,
+                    reason,
+                    guild: interaction.guild,
+                    caseNumber: result.caseNumber
+                })]
+            });
         } catch (error) {
             console.error('Unban Command Error:', error);
-            return interaction.editReply({
-                content: '❌ Failed to unban user.'
-            });
+            return interaction.editReply({ content: '❌ Failed to unban user.' });
         }
     }
 };
