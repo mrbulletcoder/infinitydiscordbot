@@ -4,7 +4,7 @@ async function handleHelpMenu(interaction) {
     const selected = interaction.values[0];
     const HELP_COLOR = '#00bfff';
 
-    const categoryOrder = ['general', 'music', 'moderation', 'automod', 'admin'];
+    const categoryOrder = ['general', 'economy', 'music', 'moderation', 'automod', 'admin'];
 
     const categoryMeta = {
         overview: {
@@ -13,6 +13,7 @@ async function handleHelpMenu(interaction) {
             description: 'Welcome to Infinity — a powerful moderation and utility bot built to keep your server clean, organised, and easy to manage.'
         },
         general: { emoji: '⚙️', title: 'General & Utility', description: 'Core utility and everyday commands for members and staff.' },
+        economy: { emoji: '💰', title: 'Economy', description: 'Fun money commands, rewards, leaderboards, and server economy features.' },
         music: { emoji: '🎵', title: 'Music', description: 'Music playback and audio controls.' },
         moderation: { emoji: '🛡️', title: 'Moderation', description: 'Essential moderation tools for warnings, punishments, and channel control.' },
         automod: { emoji: '🤖', title: 'Automod System', description: 'Automatic protection against spam, links, caps abuse, and repeat offenses.' },

@@ -5,6 +5,8 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../../database');
+const automodCache = require('../../utils/automod');
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 async function ensureAutomodConfig(guildId) {
     await pool.query(
@@ -46,7 +48,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type');
@@ -61,7 +62,7 @@ module.exports = {
             [guildId]
         );
 
-        const automod = rows[0] || {
+        const settings = rows[0] || {
             spam_enabled: 1,
             links_enabled: 1,
             caps_enabled: 1
@@ -72,14 +73,14 @@ module.exports = {
                 .setTitle('🤖 AutoMod Settings')
                 .setColor('#00bfff')
                 .addFields(
-                    { name: '🚫 Spam', value: automod.spam_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true },
-                    { name: '🔗 Links', value: automod.links_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true },
-                    { name: '🔊 Caps', value: automod.caps_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true }
+                    { name: '🚫 Spam', value: settings.spam_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true },
+                    { name: '🔗 Links', value: settings.links_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true },
+                    { name: '🔊 Caps', value: settings.caps_enabled ? '🟢 Enabled' : '🔴 Disabled', inline: true }
                 )
                 .setFooter({ text: 'Infinity AutoMod System' })
                 .setTimestamp();
 
-            return interaction.editReply({ embeds: [embed] });
+            return safeReply(interaction,{ embeds: [embed] }, true);
         }
 
         const fieldMap = {
@@ -98,6 +99,8 @@ module.exports = {
             [enabled, guildId]
         );
 
+        automodCache.invalidateAutomodCache(guildId);
+
         const embed = new EmbedBuilder()
             .setTitle('⚙️ AutoMod Updated')
             .setColor('#00ff00')
@@ -105,6 +108,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

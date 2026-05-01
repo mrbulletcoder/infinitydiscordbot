@@ -3,6 +3,8 @@ require('dotenv').config({ quiet: true });
 
 const { testConnection } = require('./database');
 
+const { logError } = require('./utils/errorHandler');
+
 function validateEnv() {
     const required = [
         'DISCORD_TOKEN',
@@ -22,11 +24,11 @@ function validateEnv() {
 
 // Global process error handlers
 process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled Rejection:', reason);
+    logError('UNHANDLED REJECTION', reason);
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
+    logError('UNCAUGHT EXCEPTION', error);
     process.exit(1);
 });
 
@@ -55,7 +57,9 @@ const client = new Client({
     partials: [
         Partials.Message,
         Partials.Channel,
-        Partials.Reaction
+        Partials.Reaction,
+        Partials.User,
+        Partials.GuildMember
     ]
 });
 
@@ -76,7 +80,7 @@ client.on('shardResume', (id, replayed) => {
 });
 
 client.on('error', (error) => {
-    console.error('Discord client error:', error);
+    logError('DISCORD CLIENT', error);
 });
 
 async function startBot() {
@@ -85,13 +89,17 @@ async function startBot() {
 
         await testConnection();
 
+        client.startupStats = {
+            database: 'Connected'
+        };
+
         await require('./handlers/commandHandler')(client);
         require('./handlers/eventHandler')(client);
 
         await client.login(process.env.DISCORD_TOKEN);
         console.log('✅ Infinity is starting...');
     } catch (error) {
-        console.error('❌ Failed to start Infinity:', error);
+        logError('STARTUP', error);
         process.exit(1);
     }
 }

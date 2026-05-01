@@ -8,6 +8,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'ticketpanel',
     description: 'Send the ticket creation panel.',
@@ -20,7 +22,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const [rows] = await pool.query(
             `SELECT panel_channel_id
@@ -32,10 +33,10 @@ module.exports = {
 
         const settings = rows[0];
         if (!settings?.panel_channel_id) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Ticket system is not configured yet. Use `/ticketconfig` first.',
                 ephemeral: true
-            });
+            }, true);
         }
 
         const panelChannel =
@@ -43,10 +44,10 @@ module.exports = {
             await interaction.guild.channels.fetch(settings.panel_channel_id).catch(() => null);
 
         if (!panelChannel) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ The configured panel channel could not be found.',
                 ephemeral: true
-            });
+            }, true);
         }
 
         const embed = new EmbedBuilder()
@@ -81,9 +82,9 @@ module.exports = {
             components: [row]
         });
 
-        return interaction.editReply({
+        return safeReply(interaction,{
             content: `✅ Ticket panel sent to ${panelChannel}.`,
             ephemeral: true
-        });
+        }, true);
     }
 };

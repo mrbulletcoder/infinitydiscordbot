@@ -7,6 +7,8 @@ const {
 
 const logAction = require('../../utils/logAction');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const UNBAN_COLOR = '#57f287';
 
 function formatUser(user) {
@@ -120,38 +122,45 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const userId = interaction.options.getString('userid', true);
-        const reason = interaction.options.getString('reason') || 'No reason provided';
+    const userId = interaction.options.getString('userid', true);
+    const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        if (!/^\d{17,20}$/.test(userId)) {
-            return interaction.reply({ content: '❌ Provide a valid banned user ID.', flags: MessageFlags.Ephemeral });
-        }
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-        try {
-            const result = await runUnban({
-                client: interaction.client,
-                guild: interaction.guild,
-                userId,
-                moderator: interaction.user,
-                reason
-            });
-
-            if (result.error) return interaction.editReply({ content: `❌ ${result.error}` });
-
-            return interaction.editReply({
-                embeds: [buildUnbanEmbed({
-                    user: result.user,
-                    moderator: interaction.user,
-                    reason,
-                    guild: interaction.guild,
-                    caseNumber: result.caseNumber
-                })]
-            });
-        } catch (error) {
-            console.error('Unban Command Error:', error);
-            return interaction.editReply({ content: '❌ Failed to unban user.' });
-        }
+    if (!/^\d{17,20}$/.test(userId)) {
+        return safeReply(interaction, {
+            content: '❌ Provide a valid banned user ID.'
+        }, true);
     }
+
+    try {
+        const result = await runUnban({
+            client: interaction.client,
+            guild: interaction.guild,
+            userId,
+            moderator: interaction.user,
+            reason
+        });
+
+        if (result.error) {
+            return safeReply(interaction, {
+                content: `❌ ${result.error}`
+            }, true);
+        }
+
+        return safeReply(interaction, {
+            embeds: [buildUnbanEmbed({
+                user: result.user,
+                moderator: interaction.user,
+                reason,
+                guild: interaction.guild,
+                caseNumber: result.caseNumber
+            })]
+        }, true);
+    } catch (error) {
+        console.error('Unban Command Error:', error);
+
+        return safeReply(interaction, {
+            content: '❌ Failed to unban user.'
+        }, true);
+    }
+}
 };

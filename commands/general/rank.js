@@ -7,6 +7,8 @@ const {
     buildRankCardAttachment
 } = require('../../utils/rank');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'rank',
     description: 'View a user rank card.',
@@ -23,15 +25,14 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         try {
             const targetUser = interaction.options.getUser('user') || interaction.user;
 
             if (targetUser.bot) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: '❌ Bots do not have rank data.'
-                });
+                }, true);
             }
 
             const rankData = await getRankCardData(interaction.guild.id, targetUser.id);
@@ -44,15 +45,15 @@ module.exports = {
                 rankData
             });
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 files: [attachment]
-            });
+            }, true);
         } catch (error) {
             console.error('Rank command error:', error);
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Something went wrong while loading that rank card.'
-            });
+            }, true);
         }
     }
 };

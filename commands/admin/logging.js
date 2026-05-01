@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder, MessageFlags } = require('discord.js');
 const { CATEGORY_LABELS, getLogSettings, setIgnoredChannel, setLogChannel, setLoggingEnabled } = require('../../utils/advancedLogger');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const choices = [
     { name: 'Message Logs', value: 'message' }, { name: 'Member Logs', value: 'member' },
     { name: 'Role Logs', value: 'role' }, { name: 'Channel Logs', value: 'channel' },
@@ -32,7 +34,6 @@ module.exports = {
             .addChannelOption(o => o.setName('channel').setDescription('Channel').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(true))),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
             const sub = interaction.options.getSubcommand();
             const guildId = interaction.guild.id;
@@ -43,22 +44,22 @@ module.exports = {
                 const me = interaction.guild.members.me || await interaction.guild.members.fetchMe().catch(() => null);
                 const perms = me ? channel.permissionsFor(me) : null;
                 if (!perms?.has(PermissionFlagsBits.ViewChannel) || !perms?.has(PermissionFlagsBits.SendMessages) || !perms?.has(PermissionFlagsBits.EmbedLinks)) {
-                    return interaction.editReply({ embeds: [embed('#ff4d4d', 'Missing Permissions', `I need **View Channel**, **Send Messages**, and **Embed Links** in ${channel}.`)] });
+                    return safeReply(interaction,{ embeds: [embed('#ff4d4d', 'Missing Permissions', `I need **View Channel**, **Send Messages**, and **Embed Links** in ${channel}.`)] }, true);
                 }
                 await setLogChannel(guildId, category, channel.id);
-                return interaction.editReply({ embeds: [embed('#57f287', 'Logging Channel Updated', `**${CATEGORY_LABELS[category]}** will now be sent to ${channel}.`)] });
+                return safeReply(interaction,{ embeds: [embed('#57f287', 'Logging Channel Updated', `**${CATEGORY_LABELS[category]}** will now be sent to ${channel}.`)] }, true);
             }
 
             if (sub === 'enable' || sub === 'disable') {
                 const enabled = sub === 'enable';
                 await setLoggingEnabled(guildId, enabled);
-                return interaction.editReply({ embeds: [embed(enabled ? '#57f287' : '#ff4d4d', enabled ? 'Advanced Logging Enabled' : 'Advanced Logging Disabled', enabled ? 'Infinity will now send configured server logs.' : 'Infinity will stop sending advanced server logs.')] });
+                return safeReply(interaction,{ embeds: [embed(enabled ? '#57f287' : '#ff4d4d', enabled ? 'Advanced Logging Enabled' : 'Advanced Logging Disabled', enabled ? 'Infinity will now send configured server logs.' : 'Infinity will stop sending advanced server logs.')] }, true);
             }
 
             if (sub === 'ignore' || sub === 'unignore') {
                 const channel = interaction.options.getChannel('channel', true);
                 await setIgnoredChannel(guildId, channel.id, sub === 'ignore');
-                return interaction.editReply({ embeds: [embed('#57f287', sub === 'ignore' ? 'Channel Ignored' : 'Channel Unignored', `${channel} ${sub === 'ignore' ? 'will be ignored by message logs.' : 'will now be included in message logs.'}`)] });
+                return safeReply(interaction,{ embeds: [embed('#57f287', sub === 'ignore' ? 'Channel Ignored' : 'Channel Unignored', `${channel} ${sub === 'ignore' ? 'will be ignored by message logs.' : 'will now be included in message logs.'}`)] }, true);
             }
 
             if (sub === 'status') {
@@ -78,11 +79,11 @@ module.exports = {
                         ].join('\n')
                     }, { name: 'Ignored Message Channels', value: ignored.length ? ignored.map(id => `<#${id}>`).join('\n') : '`None`' })
                     .setTimestamp();
-                return interaction.editReply({ embeds: [status] });
+                return safeReply(interaction,{ embeds: [status] }, true);
             }
         } catch (error) {
             console.error('Logging command error:', error);
-            return interaction.editReply({ embeds: [embed('#ff4d4d', 'Logging Error', 'Something went wrong while configuring logging.')] });
+            return safeReply(interaction,{ embeds: [embed('#ff4d4d', 'Logging Error', 'Something went wrong while configuring logging.')] }, true);
         }
     }
 };

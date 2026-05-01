@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
@@ -10,6 +9,8 @@ const {
     checkPrefixHierarchy,
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const KICK_COLOR = '#ff9900';
 
@@ -182,22 +183,16 @@ module.exports = {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         if (!member) {
-            return interaction.reply({
-                content: '❌ User not found in this server.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, { content: '❌ User not found in this server.' }, true);
         }
 
         if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.kickable) {
-            return interaction.reply({
-                content: '❌ I cannot kick this user. Make sure my role is above theirs.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ I cannot kick this user. Make sure my role is above theirs.'
+            }, true);
         }
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const { caseNumber, targetUser } = await runKick({
@@ -208,7 +203,7 @@ module.exports = {
                 reason
             });
 
-            return interaction.editReply({
+            return safeReply(interaction, {
                 embeds: [
                     buildKickEmbed({
                         user: targetUser,
@@ -218,10 +213,10 @@ module.exports = {
                         caseNumber
                     })
                 ]
-            });
+            }, true);
         } catch (error) {
             console.error('Kick Command Error:', error);
-            return interaction.editReply({ content: '❌ Failed to kick user.' });
+            return safeReply(interaction, { content: '❌ Failed to kick user.' }, true);
         }
     }
 };

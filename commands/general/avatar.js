@@ -3,6 +3,8 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 function getAvatarLinks(user, member) {
     const globalPng = user.displayAvatarURL({ extension: 'png', size: 4096 });
     const globalJpg = user.displayAvatarURL({ extension: 'jpg', size: 4096 });
@@ -69,8 +71,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-        
+
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
@@ -119,6 +120,10 @@ module.exports = {
             .setFooter({ text: 'Infinity Bot • Avatar Intelligence ⚡' })
             .setTimestamp();
 
-        return ctx.editReply({ embeds: [embed] });
+        if (isSlash) {
+            return safeReply(ctx, { embeds: [embed] }, true);
+        }
+
+        return ctx.reply({ embeds: [embed] });
     }
 };

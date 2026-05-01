@@ -8,6 +8,8 @@ const {
     calculateLevelFromXp
 } = require('../../utils/rank');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'leaderboard',
     description: 'View the server XP leaderboard.',
@@ -18,15 +20,14 @@ module.exports = {
         .setDescription('View the server rank leaderboard'),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         try {
             const rows = await getLeaderboard(interaction.guild.id, 10, 0);
 
             if (!rows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: '❌ No leaderboard data exists for this server yet.'
-                });
+                }, true);
             }
 
             const leaderboardRows = [];
@@ -47,9 +48,9 @@ module.exports = {
             }
 
             if (!leaderboardRows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: '❌ No leaderboard data exists for this server yet.'
-                });
+                }, true);
             }
 
             const attachment = await buildLeaderboardAttachment({
@@ -57,15 +58,15 @@ module.exports = {
                 leaderboardRows
             });
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 files: [attachment]
-            });
+            }, true);
         } catch (error) {
             console.error('Leaderboard command error:', error);
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Something went wrong while loading the leaderboard.'
-            });
+            }, true);
         }
     }
 };

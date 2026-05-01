@@ -22,6 +22,8 @@ const {
     createAppealTicket
 } = require('../../utils/appeals');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'appeal',
     description: 'Start a moderation appeal.',
@@ -37,7 +39,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         // DM flow
         if (!interaction.guild) {
@@ -47,9 +48,9 @@ module.exports = {
             );
 
             if (!eligibleGuilds.length) {
-                return interaction.editReply({
+                return safeReply(interaction, {
                     content: '❌ I could not find any servers where you have appealable cases.'
-                });
+                }, true);
             }
 
             const options = eligibleGuilds.slice(0, 25).map(guild => ({
@@ -74,10 +75,10 @@ module.exports = {
                 .setFooter({ text: 'Infinity Appeals' })
                 .setTimestamp();
 
-            return interaction.editReply({
+            return safeReply(interaction, {
                 embeds: [embed],
                 components: [row]
-            });
+            }, true);
         }
 
         // Guild flow
@@ -88,15 +89,15 @@ module.exports = {
         );
 
         if (!result.ok) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Failed to load your cases.'
-            });
+            }, true);
         }
 
         if (!result.rows.length) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ You do not have any appealable cases in this server.'
-            });
+            }, true);
         }
 
         const options = result.rows.slice(0, 25).map(row => ({
@@ -112,9 +113,9 @@ module.exports = {
                 .addOptions(options)
         );
 
-        return interaction.editReply({
+        return safeReply(interaction,{
             content: 'Select the case you want to appeal.',
             components: [row]
-        });
+        }, true);
     }
 };

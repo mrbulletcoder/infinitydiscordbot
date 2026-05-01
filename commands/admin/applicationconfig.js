@@ -6,6 +6,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'applicationconfig',
     description: 'Configure the applications system.',
@@ -39,7 +41,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const panel = interaction.options.getChannel('panel', true);
         const review = interaction.options.getChannel('review', true);
@@ -89,6 +90,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Applications' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

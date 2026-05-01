@@ -4,6 +4,8 @@ const {
     ChannelType
 } = require('discord.js');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 function formatFullDate(date) {
     const unix = Math.floor(date.getTime() / 1000);
     return `<t:${unix}:F>\n<t:${unix}:R>`;
@@ -106,7 +108,6 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         return this.sendStats(interaction, interaction.guild);
     },

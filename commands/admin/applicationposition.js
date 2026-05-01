@@ -5,6 +5,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'applicationposition',
     description: 'Manage application positions.',
@@ -61,7 +63,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const sub = interaction.options.getSubcommand();
 
@@ -95,7 +96,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity Applications' })
                 .setTimestamp();
 
-            return interaction.editReply({ embeds: [embed], ephemeral: true });
+            return safeReply(interaction, { embeds: [embed] }, true);
         }
 
         if (sub === 'remove') {
@@ -110,10 +111,9 @@ module.exports = {
 
             const position = rows[0];
             if (!position) {
-                return interaction.editReply({
-                    content: '❌ Application position not found.',
-                    ephemeral: true
-                });
+                return safeReply(interaction, {
+                    content: '❌ Application position not found.'
+                }, true);
             }
 
             await pool.query(
@@ -122,10 +122,9 @@ module.exports = {
                 [interaction.guild.id, id]
             );
 
-            return interaction.editReply({
-                content: `✅ Removed application position \`${position.name}\` (\`#${position.id}\`).`,
-                ephemeral: true
-            });
+            return safeReply(interaction, {
+                content: `✅ Removed application position \`${position.name}\` (\`#${position.id}\`).`
+            }, true);
         }
 
         if (sub === 'toggle') {
@@ -140,10 +139,9 @@ module.exports = {
 
             const position = rows[0];
             if (!position) {
-                return interaction.editReply({
-                    content: '❌ Application position not found.',
-                    ephemeral: true
-                });
+                return safeReply(interaction, {
+                    content: '❌ Application position not found.'
+                }, true);
             }
 
             const newState = position.enabled ? 0 : 1;
@@ -155,10 +153,9 @@ module.exports = {
                 [newState, interaction.guild.id, id]
             );
 
-            return interaction.editReply({
-                content: `✅ Position \`${position.name}\` is now ${newState ? '**enabled**' : '**disabled**'}.`,
-                ephemeral: true
-            });
+            return safeReply(interaction, {
+                content: `✅ Position \`${position.name}\` is now ${newState ? '**enabled**' : '**disabled**'}.`
+            }, true);
         }
 
         if (sub === 'list') {
@@ -170,10 +167,9 @@ module.exports = {
             );
 
             if (!rows.length) {
-                return interaction.editReply({
-                    content: '❌ No application positions have been created yet.',
-                    ephemeral: true
-                });
+                return safeReply(interaction, {
+                    content: '❌ No application positions have been created yet.'
+                }, true);
             }
 
             const embed = new EmbedBuilder()
@@ -192,7 +188,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity Applications' })
                 .setTimestamp();
 
-            return interaction.editReply({ embeds: [embed], ephemeral: true });
+            return safeReply(interaction, { embeds: [embed] }, true);
         }
     }
 };

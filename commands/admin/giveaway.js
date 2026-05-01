@@ -17,6 +17,8 @@ const {
     editGiveawayMessage
 } = require('../../utils/giveaway');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'giveaway',
     description: 'Create and manage giveaways.',
@@ -206,7 +208,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const sub = interaction.options.getSubcommand();
@@ -225,7 +226,7 @@ module.exports = {
                 const durationMs = parseDuration(durationInput);
 
                 if (!durationMs || durationMs < 10_000) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ Duration must be at least **10s**. Example: `10m`, `1h`, `2d`'
                     });
                 }
@@ -283,9 +284,9 @@ module.exports = {
 
                 await scheduleGiveaway(interaction.client, result.insertId);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Giveaway sent in ${channel} for **${prize}**.`
-                });
+                }, true);
             }
 
             if (sub === 'edit') {
@@ -293,9 +294,9 @@ module.exports = {
                 const giveaway = await fetchGiveawayByMessage(messageId);
 
                 if (!giveaway) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ Giveaway not found for that message ID.'
-                    });
+                    }, true);
                 }
 
                 const newPrize = interaction.options.getString('prize');
@@ -312,7 +313,7 @@ module.exports = {
                 if (newDuration) {
                     const durationMs = parseDuration(newDuration);
                     if (!durationMs || durationMs < 10_000) {
-                        return interaction.editReply({
+                        return safeReply(interaction,{
                             content: '❌ Duration must be at least **10s**.'
                         });
                     }
@@ -349,9 +350,9 @@ module.exports = {
                 await editGiveawayMessage(interaction.client, updatedGiveaway);
                 await scheduleGiveaway(interaction.client, updatedGiveaway.id);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Giveaway updated for **${updatedGiveaway.prize}**.`
-                });
+                }, true);
             }
 
             if (sub === 'end') {
@@ -359,22 +360,22 @@ module.exports = {
                 const giveaway = await fetchGiveawayByMessage(messageId);
 
                 if (!giveaway) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ Giveaway not found for that message ID.'
-                    });
+                    }, true);
                 }
 
                 const result = await endGiveaway(interaction.client, giveaway.id, false);
 
                 if (!result.ok && result.reason === 'already_ended') {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ That giveaway has already ended.'
-                    });
+                    }, true);
                 }
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Giveaway ended for **${giveaway.prize}**.`
-                });
+                }, true);
             }
 
             if (sub === 'reroll') {
@@ -382,22 +383,22 @@ module.exports = {
                 const giveaway = await fetchGiveawayByMessage(messageId);
 
                 if (!giveaway) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ Giveaway not found for that message ID.'
-                    });
+                    }, true);
                 }
 
                 if (!giveaway.ended) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ End the giveaway before rerolling it.'
-                    });
+                    }, true);
                 }
 
                 await endGiveaway(interaction.client, giveaway.id, true);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Giveaway rerolled for **${giveaway.prize}**.`
-                });
+                }, true);
             }
 
             if (sub === 'list') {
@@ -407,9 +408,9 @@ module.exports = {
                 );
 
                 if (!rows.length) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ No giveaways found for this server.'
-                    });
+                    }, true);
                 }
 
                 const active = rows.filter(row => !row.ended);
@@ -434,9 +435,9 @@ module.exports = {
                         : 'No ended giveaways.'
                 });
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [embed]
-                });
+                }, true);
             }
 
             if (sub === 'delete') {
@@ -445,9 +446,9 @@ module.exports = {
                 const giveaway = await fetchGiveawayByMessage(messageId);
 
                 if (!giveaway) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ Giveaway not found for that message ID.'
-                    });
+                    }, true);
                 }
 
                 if (deleteMessage) {
@@ -462,20 +463,20 @@ module.exports = {
 
                 await pool.query(`DELETE FROM giveaways WHERE id = ?`, [giveaway.id]);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Giveaway deleted for **${giveaway.prize}**.`
-                });
+                }, true);
             }
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Unknown subcommand.'
-            });
+            }, true);
         } catch (error) {
             console.error('Giveaway command error:', error);
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Something went wrong while running that command.'
-            });
+            }, true);
         }
     }
 };

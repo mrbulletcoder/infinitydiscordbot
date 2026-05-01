@@ -12,6 +12,8 @@ const {
 
 const logAction = require('../../utils/logAction');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const BRAND_COLOR = '#ffaa00';
 const ERROR_COLOR = '#ff4d4d';
 
@@ -71,32 +73,29 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction);
-        if (!deferred) return;
-
         const caseNumber = interaction.options.getInteger('number', true);
         const newReason = interaction.options.getString('reason', true).trim();
 
         const existing = await getCaseByNumber(interaction.guild.id, caseNumber);
 
         if (!existing.ok) {
-            return interaction.editReply({ embeds: [errorEmbed('Failed to fetch that case.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('Failed to fetch that case.')] }, true);
         }
 
         if (!existing.rows.length) {
-            return interaction.editReply({ embeds: [errorEmbed(`Case #${caseNumber} was not found.`)] });
+            return safeReply(interaction, { embeds: [errorEmbed(`Case #${caseNumber} was not found.`)] }, true);
         }
 
         const oldCase = existing.rows[0];
 
         if ((oldCase.reason || '').trim() === newReason) {
-            return interaction.editReply({ embeds: [errorEmbed('That case already has that reason.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('That case already has that reason.')] }, true);
         }
 
         const updateResult = await editCaseReason(interaction.guild.id, caseNumber, newReason);
 
         if (!updateResult.ok) {
-            return interaction.editReply({ embeds: [errorEmbed('Failed to update the case reason.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('Failed to update the case reason.')] }, true);
         }
 
         const embed = new EmbedBuilder()
@@ -107,31 +106,11 @@ module.exports = {
             })
             .setTitle(`✏️ Case #${caseNumber} Updated`)
             .addFields(
-                {
-                    name: '🛠️ Edited By',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                },
-                {
-                    name: '⚖️ Case Action',
-                    value: oldCase.action || 'Unknown',
-                    inline: true
-                },
-                {
-                    name: '👤 Target User',
-                    value: oldCase.user_id ? `<@${oldCase.user_id}>\n\`${oldCase.user_id}\`` : 'Unknown',
-                    inline: true
-                },
-                {
-                    name: '📄 Old Reason',
-                    value: `> ${trimText(oldCase.reason, 1000)}`,
-                    inline: false
-                },
-                {
-                    name: '📝 New Reason',
-                    value: `> ${trimText(newReason, 1000)}`,
-                    inline: false
-                }
+                { name: '🛠️ Edited By', value: `${interaction.user.tag}\n\`${interaction.user.id}\``, inline: true },
+                { name: '⚖️ Case Action', value: oldCase.action || 'Unknown', inline: true },
+                { name: '👤 Target User', value: oldCase.user_id ? `<@${oldCase.user_id}>\n\`${oldCase.user_id}\`` : 'Unknown', inline: true },
+                { name: '📄 Old Reason', value: `> ${trimText(oldCase.reason, 1000)}`, inline: false },
+                { name: '📝 New Reason', value: `> ${trimText(newReason, 1000)}`, inline: false }
             )
             .setFooter({ text: 'Infinity Moderation • Case Reason Edited' })
             .setTimestamp();
@@ -154,6 +133,6 @@ module.exports = {
             existingCaseNumber: caseNumber
         }).catch(() => null);
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

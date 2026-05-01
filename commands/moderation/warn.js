@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
@@ -11,6 +10,8 @@ const {
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
 const { insertWarning } = require('../../utils/moderationDb');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const WARN_COLOR = '#ffcc00';
 
@@ -202,22 +203,18 @@ module.exports = {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         if (!targetMember) {
-            return interaction.reply({
-                content: '❌ User not found in this server.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ User not found in this server.'
+            }, true);
         }
 
         if (targetUser.bot) {
-            return interaction.reply({
-                content: '❌ You cannot warn bots.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ You cannot warn bots.'
+            }, true);
         }
 
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const { caseNumber, warningId } = await runWarn({
@@ -228,7 +225,7 @@ module.exports = {
                 reason
             });
 
-            return interaction.editReply({
+            return safeReply(interaction, {
                 embeds: [
                     buildWarnEmbed({
                         user: targetUser,
@@ -239,10 +236,13 @@ module.exports = {
                         caseNumber
                     })
                 ]
-            });
+            }, true);
         } catch (error) {
             console.error('Warn Command Error:', error);
-            return interaction.editReply({ content: '❌ Failed to warn user.' });
+
+            return safeReply(interaction, {
+                content: '❌ Failed to warn user.'
+            }, true);
         }
     }
 };

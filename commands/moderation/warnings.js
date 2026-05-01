@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getWarnings } = require('../../utils/moderationDb');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'warnings',
     description: 'View all warnings issued to a user.',
@@ -58,41 +60,49 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-
         const targetUser = interaction.options.getUser('user', true);
 
-        const result = await getWarnings(interaction.guild.id, targetUser.id);
-        if (!result.ok) {
-            return interaction.editReply({
-                content: '❌ Failed to fetch warnings.',
-                ephemeral: true
-            });
+        try {
+            const result = await getWarnings(interaction.guild.id, targetUser.id);
+
+            if (!result.ok) {
+                return safeReply(interaction, {
+                    content: '❌ Failed to fetch warnings.'
+                }, true);
+            }
+
+            const rows = result.rows;
+
+            const lines = await Promise.all(
+                rows.map(async (warning, index) => {
+                    const moderator = warning.moderator_id
+                        ? await interaction.client.users.fetch(warning.moderator_id).catch(() => null)
+                        : null;
+
+                    return `**${index + 1}.** ${warning.reason}\n> Moderator: ${moderator ? moderator.tag : (warning.moderator_id || 'Unknown')}\n> Date: <t:${warning.created_at}:R>`;
+                })
+            );
+
+            const embed = new EmbedBuilder()
+                .setAuthor({
+                    name: `⚠️ Warnings • ${targetUser.tag}`,
+                    iconURL: targetUser.displayAvatarURL({ dynamic: true })
+                })
+                .setColor('#ffaa00')
+                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+                .setDescription(lines.length ? lines.join('\n\n') : '✅ No warnings')
+                .setFooter({ text: `Infinity Moderation • Total: ${rows.length}` })
+                .setTimestamp();
+
+            return safeReply(interaction, {
+                embeds: [embed]
+            }, true);
+        } catch (error) {
+            console.error('Warnings Command Error:', error);
+
+            return safeReply(interaction, {
+                content: '❌ Failed to fetch warnings.'
+            }, true);
         }
-
-        const rows = result.rows;
-
-        const lines = await Promise.all(
-            rows.map(async (warning, index) => {
-                const moderator = warning.moderator_id
-                    ? await interaction.client.users.fetch(warning.moderator_id).catch(() => null)
-                    : null;
-
-                return `**${index + 1}.** ${warning.reason}\n> Moderator: ${moderator ? moderator.tag : (warning.moderator_id || 'Unknown')}\n> Date: <t:${warning.created_at}:R>`;
-            })
-        );
-
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: `⚠️ Warnings • ${targetUser.tag}`,
-                iconURL: targetUser.displayAvatarURL({ dynamic: true })
-            })
-            .setColor('#ffaa00')
-            .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
-            .setDescription(lines.length ? lines.join('\n\n') : '✅ No warnings')
-            .setFooter({ text: `Infinity Moderation • Total: ${rows.length}` })
-            .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
     }
 };

@@ -6,6 +6,8 @@ const {
 
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 function formatDuration(ms) {
     const seconds = Math.floor(ms / 1000);
 
@@ -66,7 +68,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type', true);
@@ -77,10 +78,10 @@ module.exports = {
         const types = type === 'all' ? ['spam', 'links', 'caps'] : [type];
 
         if (action === 'timeout' && !duration) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ You must provide a duration in seconds for timeout.',
                 ephemeral: true
-            });
+            }, true);
         }
 
         const punishmentValue = action === 'timeout'
@@ -112,6 +113,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

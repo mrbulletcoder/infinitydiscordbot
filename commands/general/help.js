@@ -1,4 +1,4 @@
-const categoryOrder = ['general', 'music', 'moderation', 'automod', 'admin'];
+const categoryOrder = ['general', 'economy', 'music', 'moderation', 'automod', 'admin'];
 
 const {
     SlashCommandBuilder,
@@ -6,6 +6,8 @@ const {
     ActionRowBuilder,
     StringSelectMenuBuilder
 } = require('discord.js');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const HELP_COLOR = '#00bfff';
 
@@ -19,6 +21,11 @@ const categoryMeta = {
         emoji: '⚙️',
         title: 'General & Utility',
         description: 'Core utility and everyday commands for members and staff.'
+    },
+    economy: {
+        emoji: '💰',
+        title: 'Economy',
+        description: 'Fun money commands, rewards, leaderboards, and server economy features.'
     },
     music: {
         emoji: '🎵',
@@ -228,17 +235,18 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-
         const commandName = interaction.options.getString('command')?.toLowerCase();
 
         if (commandName) {
             const cmd = interaction.client.commands.get(commandName);
+
             if (!cmd) {
-                return interaction.editReply({ content: '❌ Command not found.', ephemeral: true });
+                return safeReply(interaction, { content: '❌ Command not found.' }, true);
             }
 
-            return interaction.editReply({ embeds: [createCommandEmbed(cmd)] });
+            return safeReply(interaction, {
+                embeds: [createCommandEmbed(cmd)]
+            }, true);
         }
 
         return sendHelp(interaction, interaction.client, true);

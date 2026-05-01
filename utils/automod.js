@@ -1,9 +1,23 @@
 const { pool } = require('../database');
 const logAction = require('./logAction');
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { logError } = require('./errorHandler');
 
-const DISPLAY_TIME = 20000; // 20 seconds
+const DISPLAY_TIME = 20000;
+const CACHE_TIME = 60 * 1000;
+
 const userMessages = new Map();
+const configCache = new Map();
+const whitelistCache = new Map();
+
+function isCacheValid(cacheItem) {
+    return cacheItem && Date.now() - cacheItem.createdAt < CACHE_TIME;
+}
+
+function invalidateAutomodCache(guildId) {
+    configCache.delete(guildId);
+    whitelistCache.delete(guildId);
+}
 
 async function ensureAutomodConfig(guildId) {
     await pool.query(
@@ -15,6 +29,9 @@ async function ensureAutomodConfig(guildId) {
 }
 
 async function getAutomodConfig(guildId) {
+    const cached = configCache.get(guildId);
+    if (isCacheValid(cached)) return cached.data;
+
     await ensureAutomodConfig(guildId);
 
     const [rows] = await pool.query(
@@ -24,14 +41,24 @@ async function getAutomodConfig(guildId) {
         [guildId]
     );
 
-    return rows[0] || {
+    const data = rows[0] || {
         spam_enabled: 1,
         links_enabled: 1,
         caps_enabled: 1
     };
+
+    configCache.set(guildId, {
+        data,
+        createdAt: Date.now()
+    });
+
+    return data;
 }
 
 async function getWhitelist(guildId) {
+    const cached = whitelistCache.get(guildId);
+    if (isCacheValid(cached)) return cached.data;
+
     const [roleRows] = await pool.query(
         `SELECT role_id FROM automod_whitelist_roles WHERE guild_id = ?`,
         [guildId]
@@ -47,11 +74,18 @@ async function getWhitelist(guildId) {
         [guildId]
     );
 
-    return {
+    const data = {
         roles: roleRows.map(row => row.role_id),
         users: userRows.map(row => row.user_id),
         channels: channelRows.map(row => row.channel_id)
     };
+
+    whitelistCache.set(guildId, {
+        data,
+        createdAt: Date.now()
+    });
+
+    return data;
 }
 
 async function incrementOffense(guildId, userId) {
@@ -81,9 +115,7 @@ async function getPunishment(guildId, type, offenseCount) {
         [guildId, type, offenseCount]
     );
 
-    if (exactRows.length > 0) {
-        return exactRows[0].punishment;
-    }
+    if (exactRows.length > 0) return exactRows[0].punishment;
 
     const [fallbackRows] = await pool.query(
         `SELECT punishment
@@ -97,7 +129,7 @@ async function getPunishment(guildId, type, offenseCount) {
     return fallbackRows[0]?.punishment || 'warn';
 }
 
-module.exports = async function automod(message) {
+async function automod(message) {
     try {
         if (!message.guild || message.author.bot) return;
 
@@ -105,16 +137,13 @@ module.exports = async function automod(message) {
         const userId = message.author.id;
         const channelId = message.channel.id;
 
-        const config = await getAutomodConfig(guildId);
-        const whitelist = await getWhitelist(guildId);
-
-        // ===== BYPASS =====
         if (
             message.member.permissions.has(PermissionFlagsBits.Administrator) ||
             message.guild.ownerId === userId
-        ) {
-            return;
-        }
+        ) return;
+
+        const config = await getAutomodConfig(guildId);
+        const whitelist = await getWhitelist(guildId);
 
         if (whitelist.roles.some(roleId => message.member.roles.cache.has(roleId))) return;
         if (whitelist.users.includes(userId)) return;
@@ -122,7 +151,6 @@ module.exports = async function automod(message) {
 
         const content = message.content;
 
-        // ===== SPAM =====
         if (config.spam_enabled) {
             const now = Date.now();
 
@@ -142,13 +170,11 @@ module.exports = async function automod(message) {
             }
         }
 
-        // ===== LINKS =====
         if (config.links_enabled && /(https?:\/\/[^\s]+)/gi.test(content)) {
             await punish(message, '🔗 Unauthorized Link', 'links');
             return;
         }
 
-        // ===== CAPS =====
         if (config.caps_enabled) {
             const letters = content.replace(/[^a-zA-Z]/g, '');
 
@@ -161,10 +187,14 @@ module.exports = async function automod(message) {
                 }
             }
         }
-    } catch (err) {
-        console.error('AutoMod Error:', err);
+    } catch (error) {
+        logError('AUTOMOD', error, {
+            event: 'messageCreate',
+            guild: message.guild ? `${message.guild.name} (${message.guild.id})` : 'Unknown',
+            user: message.author ? `${message.author.tag} (${message.author.id})` : 'Unknown'
+        });
     }
-};
+}
 
 async function punish(message, reason, type) {
     try {
@@ -179,7 +209,6 @@ async function punish(message, reason, type) {
         let action = '⚠️ Warn';
         let color = '#ffff00';
 
-        // ===== TIMEOUT =====
         if (typeof rule === 'string' && rule.startsWith('timeout:')) {
             action = '⏳ Timeout';
             color = '#ffaa00';
@@ -189,10 +218,7 @@ async function punish(message, reason, type) {
             if (message.member.moderatable && duration) {
                 await message.member.timeout(duration, reason).catch(() => {});
             }
-        }
-
-        // ===== KICK =====
-        else if (rule === 'kick') {
+        } else if (rule === 'kick') {
             action = '👢 Kick';
             color = '#ff0000';
 
@@ -201,7 +227,6 @@ async function punish(message, reason, type) {
             }
         }
 
-        // ===== LOG =====
         await logAction({
             client: message.client,
             guild: message.guild,
@@ -212,7 +237,6 @@ async function punish(message, reason, type) {
             color
         });
 
-        // ===== CLEAN EMBED UI =====
         const embed = new EmbedBuilder()
             .setColor(color)
             .setAuthor({
@@ -233,7 +257,15 @@ async function punish(message, reason, type) {
         setTimeout(() => {
             reply.delete().catch(() => {});
         }, DISPLAY_TIME);
-    } catch (err) {
-        console.error('AutoMod Punish Error:', err);
+    } catch (error) {
+        logError('AUTOMOD PUNISH', error, {
+            guild: message.guild ? `${message.guild.name} (${message.guild.id})` : 'Unknown',
+            user: message.author ? `${message.author.tag} (${message.author.id})` : 'Unknown',
+            channel: message.channel ? `${message.channel.name} (${message.channel.id})` : 'Unknown'
+        });
     }
 }
+
+automod.invalidateAutomodCache = invalidateAutomodCache;
+
+module.exports = automod;

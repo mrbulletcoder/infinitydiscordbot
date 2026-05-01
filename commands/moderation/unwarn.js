@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
@@ -14,6 +13,8 @@ const {
     getWarnings,
     deleteWarningById
 } = require('../../utils/moderationDb');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const UNWARN_COLOR = '#57f287';
 
@@ -94,14 +95,22 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const warningNumber = interaction.options.getInteger('warning', true);
 
-        if (!targetMember) return interaction.editReply({ content: '❌ User not found in this server.' });
-        if (targetUser.bot) return interaction.editReply({ content: '❌ You cannot unwarn bots.' });
+        if (!targetMember) {
+            return safeReply(interaction, {
+                content: '❌ User not found in this server.'
+            }, true);
+        }
+
+        if (targetUser.bot) {
+            return safeReply(interaction, {
+                content: '❌ You cannot unwarn bots.'
+            }, true);
+        }
+
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
 
         return removeWarning({
@@ -110,7 +119,7 @@ module.exports = {
             targetUser,
             warningNumber,
             moderator: interaction.user,
-            reply: payload => interaction.editReply(payload)
+            reply: payload => safeReply(interaction, payload, true)
         });
     }
 };

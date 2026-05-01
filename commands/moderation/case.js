@@ -10,6 +10,8 @@ const {
     getCaseNotes
 } = require('../../utils/moderationDb');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
 
@@ -162,21 +164,18 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction);
-        if (!deferred) return;
-
         const caseId = interaction.options.getInteger('number', true);
         const result = await getCaseByNumber(interaction.guild.id, caseId);
 
         if (!result.ok) {
-            return interaction.editReply({ embeds: [errorEmbed('Failed to fetch that case.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('Failed to fetch that case.')] }, true);
         }
 
         if (!result.rows.length) {
-            return interaction.editReply({ embeds: [errorEmbed(`Case #${caseId} was not found.`)] });
+            return safeReply(interaction, { embeds: [errorEmbed(`Case #${caseId} was not found.`)] }, true);
         }
 
         const embed = await buildCaseEmbed(interaction.client, interaction.guild, result.rows[0]);
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

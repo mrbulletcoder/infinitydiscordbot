@@ -6,6 +6,8 @@ const {
     ButtonStyle
 } = require('discord.js');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const CLIENT_ID = '1485150070944043078'; // your bot ID
 const INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=1374658063382&scope=bot%20applications.commands`;
 
@@ -24,8 +26,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
-        
+
         return this.sendInvite(interaction);
     },
 
@@ -59,7 +60,11 @@ module.exports = {
                 .setStyle(ButtonStyle.Link)
         );
 
-        return ctx.editReply({
+        if (isSlash) {
+            return safeReply(ctx, { embeds: [embed] }, true);
+        }
+
+        return ctx.reply({
             embeds: [embed],
             components: [row]
         });

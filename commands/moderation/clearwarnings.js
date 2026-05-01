@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
@@ -14,6 +13,8 @@ const {
     getWarnings,
     clearWarnings
 } = require('../../utils/moderationDb');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const CLEAR_WARNINGS_COLOR = '#57f287';
 
@@ -80,13 +81,17 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        if (!targetMember) return interaction.editReply({ content: '❌ User not found in this server.' });
-        if (targetUser.bot) return interaction.editReply({ content: '❌ You cannot clear warnings for bots.' });
+        if (!targetMember) {
+            return safeReply(interaction, { content: '❌ User not found in this server.' }, true);
+        }
+
+        if (targetUser.bot) {
+            return safeReply(interaction, { content: '❌ You cannot clear warnings for bots.' }, true);
+        }
+
         if (!(await checkSlashHierarchy(interaction, targetMember))) return;
 
         return runClearWarnings({
@@ -94,44 +99,7 @@ module.exports = {
             guild: interaction.guild,
             targetUser,
             moderator: interaction.user,
-            reply: payload => interaction.editReply(payload)
+            reply: payload => safeReply(interaction, payload, true)
         });
-    }
-};
-
-async function runClearWarnings({ client, guild, targetUser, moderator, reply }) {
-    try {
-        const before = await getWarnings(guild.id, targetUser.id);
-        if (!before.ok) return reply({ content: '❌ Failed to fetch warnings.' });
-
-        const clearedCount = before.rows?.length || 0;
-        if (!clearedCount) return reply({ content: '❌ That user has no warnings to clear.' });
-
-        const result = await clearWarnings(guild.id, targetUser.id);
-        if (!result.ok) return reply({ content: '❌ Failed to clear warnings.' });
-
-        const logResult = await logAction({
-            client,
-            guild,
-            action: '🧽 Clear Warnings',
-            user: targetUser,
-            moderator,
-            reason: `Cleared ${clearedCount} warning${clearedCount === 1 ? '' : 's'}`,
-            color: CLEAR_WARNINGS_COLOR,
-            extra: `**Warnings Cleared:** ${clearedCount}`
-        });
-
-        return reply({
-            embeds: [buildClearWarningsEmbed({
-                user: targetUser,
-                moderator,
-                clearedCount,
-                guild,
-                caseNumber: getCaseNumber(logResult)
-            })]
-        });
-    } catch (error) {
-        console.error('Clearwarnings Command Error:', error);
-        return reply({ content: '❌ Failed to clear warnings.' }).catch(() => null);
     }
 }

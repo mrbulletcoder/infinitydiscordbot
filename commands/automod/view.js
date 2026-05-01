@@ -9,6 +9,8 @@ const {
 
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const EMBED_COLOR = '#00bfff';
 
 function formatDuration(ms) {
@@ -170,7 +172,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const guildId = interaction.guild.id;
 
@@ -223,11 +224,11 @@ module.exports = {
                     .setDisabled(true)
             );
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 embeds: [emptyEmbed],
                 components: [emptyRow],
                 ephemeral: true
-            });
+            }, true);
         }
 
         const spamRules = rows.filter(row => row.type === 'spam');
@@ -256,9 +257,9 @@ module.exports = {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        return interaction.editReply({
+        return safeReply(interaction,{
             embeds: [embed],
             components: [row]
-        });
+        }, true);
     }
 };

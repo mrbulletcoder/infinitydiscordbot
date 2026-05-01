@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { box } = require('../utils/consoleLogger');
+const { logError } = require('../utils/errorHandler');
 
 module.exports = (client) => {
     const eventsPath = path.join(__dirname, '..', 'events');
@@ -7,12 +9,16 @@ module.exports = (client) => {
     const eventFiles = fs.readdirSync(eventsPath)
         .filter(file => file.endsWith('.js'));
 
+    const loadedEvents = [];
+    const skippedEvents = [];
+    const failedEvents = [];
+
     for (const file of eventFiles) {
         try {
             const event = require(`../events/${file}`);
 
             if (!event || !event.name || typeof event.execute !== 'function') {
-                console.warn(`⚠️ Skipping invalid event file: ${file}`);
+                skippedEvents.push(file);
                 continue;
             }
 
@@ -20,7 +26,10 @@ module.exports = (client) => {
                 try {
                     await event.execute(...args, client);
                 } catch (error) {
-                    console.error(`❌ Error in event "${event.name}" (${file}):`, error);
+                    logError('EVENT', error, {
+                        event: event.name,
+                        file
+                    });
                 }
             };
 
@@ -30,9 +39,24 @@ module.exports = (client) => {
                 client.on(event.name, safeExecute);
             }
 
-            console.log(`✅ Loaded event: ${event.name} (${file})`);
+            loadedEvents.push(event.name);
         } catch (error) {
-            console.error(`❌ Failed to load event file "${file}":`, error);
+            failedEvents.push(file);
+
+            logError('EVENT LOAD', error, {
+                file
+            });
         }
     }
+
+    client.startupStats = client.startupStats || {};
+    client.startupStats.eventsLoaded = loadedEvents.length;
+    client.startupStats.eventsSkipped = skippedEvents.length;
+    client.startupStats.eventsFailed = failedEvents.length;
+
+    box('📡 EVENT LOADER', [
+        { label: 'Loaded Events', value: loadedEvents.length },
+        { label: 'Skipped Events', value: skippedEvents.length },
+        { label: 'Failed Events', value: failedEvents.length }
+    ]);
 };

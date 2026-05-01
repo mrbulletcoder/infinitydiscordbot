@@ -6,6 +6,9 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../../database');
+const automodCache = require('../../utils/automod');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'automod-whitelist',
@@ -54,7 +57,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const guildId = interaction.guild.id;
         const type = interaction.options.getString('type', true);
@@ -91,10 +93,10 @@ module.exports = {
         }
 
         if (!id) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ You must provide the correct option for the selected type.',
                 ephemeral: true
-            });
+            }, true);
         }
 
         if (action === 'add') {
@@ -104,10 +106,10 @@ module.exports = {
             );
 
             if (existingRows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: '❌ That target is already whitelisted.',
                     ephemeral: true
-                });
+                }, true);
             }
 
             await pool.query(
@@ -124,10 +126,10 @@ module.exports = {
             );
 
             if (!existingRows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: '❌ That target is not currently whitelisted.',
                     ephemeral: true
-                });
+                }, true);
             }
 
             await pool.query(
@@ -137,13 +139,15 @@ module.exports = {
             );
         }
 
+        automodCache.invalidateAutomodCache(guildId);
+
         const embed = new EmbedBuilder()
             .setTitle('🛡️ AutoMod Whitelist Updated')
             .setColor('#00ff00')
-            .setDescription(`${label} has been **${action}ed** ${action === 'add' ? 'to' : 'from'} the ${type} whitelist.`)
+            .setDescription(`${label} has been **${action === 'add' ? 'added to' : 'removed from'}** the ${type} whitelist.`)
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

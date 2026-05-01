@@ -7,6 +7,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'applicationpanel',
     description: 'Send the application panel.',
@@ -19,7 +21,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const [settingsRows] = await pool.query(
             `SELECT panel_channel_id
@@ -31,10 +32,9 @@ module.exports = {
 
         const settings = settingsRows[0];
         if (!settings?.panel_channel_id) {
-            return interaction.editReply({
-                content: '❌ Applications are not configured yet. Use `/applicationconfig` first.',
-                ephemeral: true
-            });
+            return safeReply(interaction,{
+                content: '❌ Applications are not configured yet. Use `/applicationconfig` first.'
+            }, true);
         }
 
         const [positions] = await pool.query(
@@ -46,10 +46,9 @@ module.exports = {
         );
 
         if (!positions.length) {
-            return interaction.editReply({
-                content: '❌ No enabled application positions found. Use `/applicationposition add` first.',
-                ephemeral: true
-            });
+            return safeReply(interaction,{
+                content: '❌ No enabled application positions found. Use `/applicationposition add` first.'
+            }, true);
         }
 
         const panelChannel =
@@ -57,10 +56,9 @@ module.exports = {
             await interaction.guild.channels.fetch(settings.panel_channel_id).catch(() => null);
 
         if (!panelChannel) {
-            return interaction.editReply({
-                content: '❌ The configured panel channel could not be found.',
-                ephemeral: true
-            });
+            return safeReply(interaction,{
+                content: '❌ The configured panel channel could not be found.'
+            }, true);
         }
 
         const embed = new EmbedBuilder()
@@ -97,9 +95,8 @@ module.exports = {
             components: [row]
         });
 
-        return interaction.editReply({
-            content: `✅ Application panel sent to ${panelChannel}.`,
-            ephemeral: true
-        });
+        return safeReply(interaction,{
+            content: `✅ Application panel sent to ${panelChannel}.`
+        }, true);
     }
 };

@@ -3,7 +3,9 @@ const {
     EmbedBuilder
 } = require('discord.js');
 
-const afkUsers = new Map(); // simple memory store
+const { pool } = require('../../database');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'afk',
@@ -28,16 +30,19 @@ module.exports = {
 
     async executeSlash(interaction) {
         const reason = interaction.options.getString('reason') || 'No reason provided';
-        return this.setAFK(interaction, reason);
+        return this.setAFK(interaction, reason, true);
     },
 
-    async setAFK(ctx, reason) {
+    async setAFK(ctx, reason, isSlash = false) {
+        const guildId = ctx.guild.id;
         const userId = ctx.user ? ctx.user.id : ctx.author.id;
 
-        afkUsers.set(userId, {
-            reason,
-            timestamp: Date.now()
-        });
+        await pool.query(
+            `INSERT INTO afk_users (guild_id, user_id, reason)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE reason = VALUES(reason), created_at = CURRENT_TIMESTAMP`,
+            [guildId, userId, reason]
+        );
 
         const embed = new EmbedBuilder()
             .setColor('#00bfff')
@@ -49,9 +54,10 @@ module.exports = {
             .setFooter({ text: 'Infinity Bot • AFK System ⚡' })
             .setTimestamp();
 
+        if (isSlash) {
+            return safeReply(ctx, { embeds: [embed] }, true);
+        }
+
         return ctx.reply({ embeds: [embed] });
     }
 };
-
-// ===== EXPORT AFK DATA =====
-module.exports.afkUsers = afkUsers;

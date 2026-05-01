@@ -5,6 +5,8 @@ const {
 
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 function formatFullDate(date) {
     const unix = Math.floor(date.getTime() / 1000);
     return `<t:${unix}:F>\n<t:${unix}:R>`;
@@ -147,7 +149,6 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);

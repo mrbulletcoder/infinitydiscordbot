@@ -37,9 +37,9 @@ async function handleRefreshPing(interaction) {
     const end = Date.now();
 
     const apiLatency = end - start;
-    const messageLatency = Date.now() - interaction.message.createdTimestamp;
+    const messageLatency = end - interaction.createdTimestamp;
     const rawWs = interaction.client.ws.ping;
-    const wsPing = rawWs > 0 ? Math.round(rawWs) : null;
+    const wsPing = rawWs >= 0 ? Math.round(rawWs) : null;
 
     const status = getPingStatus(apiLatency);
     const color = getPingColor(apiLatency);

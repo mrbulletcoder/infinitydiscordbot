@@ -6,6 +6,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'ticketconfig',
     description: 'Configure the ticket system.',
@@ -50,7 +52,6 @@ module.exports = {
         const transcripts = interaction.options.getChannel('transcripts', true);
         const support = interaction.options.getRole('support', true);
 
-        await interaction.deferReply({ ephemeral: true });
 
         await pool.query(
             `INSERT INTO ticket_settings
@@ -103,6 +104,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Tickets' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

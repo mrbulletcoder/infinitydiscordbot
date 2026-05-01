@@ -12,6 +12,8 @@ const {
     getCasesByAction
 } = require('../../utils/moderationDb');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
 

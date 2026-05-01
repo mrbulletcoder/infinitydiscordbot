@@ -1,9 +1,11 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const logAction = require('../../utils/logAction');
 const {
     checkPrefixHierarchy,
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const TIMEOUT_COLOR = '#ffaa00';
 const MAX_TIMEOUT_MINUTES = 40320; // Discord max timeout = 28 days
@@ -170,29 +172,22 @@ module.exports = {
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
         if (!member) {
-            return interaction.reply({
-                content: '❌ User not found in this server.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, { content: '❌ User not found in this server.' }, true);
         }
 
         if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
-            return interaction.reply({
-                content: `❌ Provide a valid duration between **1** and **${MAX_TIMEOUT_MINUTES}** minutes.`,
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: `❌ Provide a valid duration between **1** and **${MAX_TIMEOUT_MINUTES}** minutes.`
+            }, true);
         }
 
         if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.moderatable) {
-            return interaction.reply({
-                content: '❌ I cannot timeout this user. Make sure my role is above theirs.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ I cannot timeout this user. Make sure my role is above theirs.'
+            }, true);
         }
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const { expiresAt, caseNumber } = await runTimeout({
@@ -213,12 +208,10 @@ module.exports = {
                 caseNumber
             });
 
-            return interaction.editReply({ embeds: [embed] });
+            return safeReply(interaction, { embeds: [embed] }, true);
         } catch (error) {
             console.error('Timeout Command Error:', error);
-            return interaction.editReply({
-                content: '❌ Failed to timeout user.'
-            });
+            return safeReply(interaction, { content: '❌ Failed to timeout user.' }, true);
         }
     }
 };

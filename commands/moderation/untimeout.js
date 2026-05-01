@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const logAction = require('../../utils/logAction');
@@ -10,6 +9,8 @@ const {
     checkPrefixHierarchy,
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
+
+const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const UNTIMEOUT_COLOR = '#57f287';
 
@@ -163,29 +164,24 @@ module.exports = {
         const reason = interaction.options.getString('reason') || 'Timeout removed';
 
         if (!member) {
-            return interaction.reply({
-                content: '❌ User not found in this server.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ User not found in this server.'
+            }, true);
         }
 
         if (!(await checkSlashHierarchy(interaction, member))) return;
 
         if (!member.communicationDisabledUntilTimestamp) {
-            return interaction.reply({
-                content: '❌ That user is not timed out.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ That user is not timed out.'
+            }, true);
         }
 
         if (!member.moderatable) {
-            return interaction.reply({
-                content: '❌ I cannot remove timeout from this user.',
-                flags: MessageFlags.Ephemeral
-            });
+            return safeReply(interaction, {
+                content: '❌ I cannot remove timeout from this user.'
+            }, true);
         }
-
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const { previousTimeoutUnix, caseNumber } = await runUntimeout({
@@ -196,7 +192,7 @@ module.exports = {
                 reason
             });
 
-            return interaction.editReply({
+            return safeReply(interaction, {
                 embeds: [
                     buildUntimeoutEmbed({
                         member,
@@ -207,10 +203,13 @@ module.exports = {
                         caseNumber
                     })
                 ]
-            });
+            }, true);
         } catch (error) {
             console.error('Untimeout Command Error:', error);
-            return interaction.editReply({ content: '❌ Failed to remove timeout.' });
+
+            return safeReply(interaction, {
+                content: '❌ Failed to remove timeout.'
+            }, true);
         }
     }
 };

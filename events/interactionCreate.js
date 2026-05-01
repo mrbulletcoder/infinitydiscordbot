@@ -3,6 +3,7 @@ const { handleSlashCommand } = require('../handlers/interactions/slashCommandHan
 const { handleButton } = require('../handlers/interactions/buttonHandler.js');
 const { handleModal } = require('../handlers/interactions/modalHandler');
 const { handleStringSelectMenu } = require('../handlers/interactions/selectMenuHandler');
+const { logError } = require('../utils/errorHandler');
 
 module.exports = {
     name: 'interactionCreate',
@@ -25,8 +26,15 @@ module.exports = {
                 return handleStringSelectMenu(interaction);
             }
         } catch (error) {
-            console.error('❌ Unhandled interactionCreate error:', error);
-            return safeErrorReply(interaction);
+            const errorId = logError('INTERACTION', error, {
+                event: 'interactionCreate',
+                command: interaction.commandName || 'Unknown',
+                user: interaction.user ? `${interaction.user.tag} (${interaction.user.id})` : 'Unknown',
+                guild: interaction.guild ? `${interaction.guild.name} (${interaction.guild.id})` : 'DM',
+                channel: interaction.channel ? `${interaction.channel.name} (${interaction.channel.id})` : 'Unknown'
+            });
+
+            return safeErrorReply(interaction, errorId);
         }
     }
 };

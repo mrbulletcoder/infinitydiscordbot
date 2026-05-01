@@ -9,6 +9,8 @@ const {
 
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const recentReportPairs = new Map();
 const recentReporterWindows = new Map();
 
@@ -439,7 +441,6 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const targetUser = interaction.options.getUser('user', true);
         const reason = interaction.options.getString('reason', true).trim();

@@ -4,7 +4,8 @@ const prefix = process.env.PREFIX || '!';
 const automod = require('../utils/automod');
 const { checkPrefixPermission } = require('../utils/checkPermissions');
 const { giveMessageXp } = require('../utils/rank');
-const { afkUsers } = require('../commands/general/afk');
+const { logError } = require('../utils/errorHandler');
+const { pool } = require('../database');
 
 // ===== SAFE MESSAGE REPLY =====
 async function safeReply(message, options) {
@@ -71,8 +72,20 @@ module.exports = {
             // ==================================================
             // AFK: REMOVE AFK STATUS WHEN USER SPEAKS
             // ==================================================
-            if (afkUsers.has(message.author.id)) {
-                afkUsers.delete(message.author.id);
+            const [ownAfkRows] = await pool.query(
+                `SELECT reason, created_at
+     FROM afk_users
+     WHERE guild_id = ? AND user_id = ?
+     LIMIT 1`,
+                [message.guild.id, message.author.id]
+            );
+
+            if (ownAfkRows.length) {
+                await pool.query(
+                    `DELETE FROM afk_users
+         WHERE guild_id = ? AND user_id = ?`,
+                    [message.guild.id, message.author.id]
+                );
 
                 await safeReply(message, {
                     content: '👋 Welcome back! Your AFK status has been removed.'
@@ -83,27 +96,38 @@ module.exports = {
             // AFK: NOTIFY IF MENTIONED USER IS AFK
             // ==================================================
             if (message.mentions?.users?.size > 0) {
-                const afkReplies = [];
+                const mentionedUsers = [...message.mentions.users.values()]
+                    .filter(user => user && !user.bot && user.id !== message.author.id);
 
-                message.mentions.users.forEach(user => {
-                    if (!user || user.bot) return;
-                    if (!afkUsers.has(user.id)) return;
-                    if (user.id === message.author.id) return;
+                if (mentionedUsers.length > 0) {
+                    const afkReplies = [];
 
-                    const afkData = afkUsers.get(user.id);
-                    if (!afkData) return;
+                    for (const user of mentionedUsers) {
+                        const [afkRows] = await pool.query(
+                            `SELECT reason, created_at
+                 FROM afk_users
+                 WHERE guild_id = ? AND user_id = ?
+                 LIMIT 1`,
+                            [message.guild.id, user.id]
+                        );
 
-                    afkReplies.push(
-                        `😴 **${user.tag} is AFK**\n` +
-                        `**Reason:** ${afkData.reason || 'No reason provided.'}\n` +
-                        `**Since:** <t:${Math.floor((afkData.timestamp || Date.now()) / 1000)}:R>`
-                    );
-                });
+                        if (!afkRows.length) continue;
 
-                if (afkReplies.length > 0) {
-                    await safeReply(message, {
-                        content: afkReplies.join('\n\n')
-                    });
+                        const afkData = afkRows[0];
+                        const timestamp = Math.floor(new Date(afkData.created_at).getTime() / 1000);
+
+                        afkReplies.push(
+                            `😴 **${user.tag} is AFK**\n` +
+                            `**Reason:** ${afkData.reason || 'No reason provided.'}\n` +
+                            `**Since:** <t:${timestamp}:R>`
+                        );
+                    }
+
+                    if (afkReplies.length > 0) {
+                        await safeReply(message, {
+                            content: afkReplies.join('\n\n')
+                        });
+                    }
                 }
             }
 
@@ -113,7 +137,12 @@ module.exports = {
             try {
                 await automod(message);
             } catch (error) {
-                console.error('AutoMod error:', error);
+                logError('AUTOMOD', error, {
+                    event: 'messageCreate',
+                    user: `${message.author.tag} (${message.author.id})`,
+                    guild: `${message.guild.name} (${message.guild.id})`,
+                    channel: `${message.channel.name} (${message.channel.id})`
+                });
             }
 
             // ==================================================
@@ -127,7 +156,11 @@ module.exports = {
                     await giveMessageXp(message);
                 }
             } catch (error) {
-                console.error('Rank XP error:', error);
+                logError('RANK XP', error, {
+                    event: 'messageCreate',
+                    user: `${message.author.tag} (${message.author.id})`,
+                    guild: `${message.guild.name} (${message.guild.id})`
+                });
             }
 
             // ==================================================
@@ -192,14 +225,21 @@ module.exports = {
             try {
                 await command.executePrefix(message, args);
             } catch (error) {
-                console.error(`Error in prefix command "${command.name}" (${commandName}):`, error);
+                const errorId = logError('PREFIX COMMAND', error, {
+                    command: command.name,
+                    user: `${message.author.tag} (${message.author.id})`,
+                    guild: `${message.guild.name} (${message.guild.id})`,
+                    channel: `${message.channel.name} (${message.channel.id})`
+                });
 
                 return safeReply(message, {
-                    content: '❌ Error executing command.'
+                    content: `❌ Something went wrong while running that command.\nError ID: \`${errorId}\``
                 });
             }
         } catch (error) {
-            console.error('Unhandled messageCreate error:', error);
+            logError('MESSAGE CREATE', error, {
+                event: 'messageCreate'
+            });
         }
     }
 };

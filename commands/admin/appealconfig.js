@@ -6,6 +6,8 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'appealconfig',
     description: 'Configure appeal ticket settings.',
@@ -33,7 +35,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const category = interaction.options.getChannel('category', true);
         const role = interaction.options.getRole('role', true);
@@ -78,15 +79,15 @@ module.exports = {
                 .setFooter({ text: 'Infinity Appeals Setup' })
                 .setTimestamp();
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 embeds: [embed]
-            });
+            }, true);
         } catch (error) {
             console.error('appealconfig error:', error);
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Failed to save appeal configuration.'
-            });
+            }, true);
         }
     }
 };

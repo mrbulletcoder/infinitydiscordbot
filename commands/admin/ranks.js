@@ -18,6 +18,8 @@ const {
     setRankXpConfig
 } = require('../../utils/rank');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 module.exports = {
     name: 'ranks',
     description: 'Manage the rank system.',
@@ -134,7 +136,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
             const sub = interaction.options.getSubcommand();
@@ -176,52 +177,52 @@ module.exports = {
                     .setFooter({ text: 'All channels are whitelisted by default unless blacklisted' })
                     .setTimestamp();
 
-                return interaction.editReply({ embeds: [embed] });
+                return safeReply(interaction,{ embeds: [embed] }, true);
             }
 
             if (sub === 'mode') {
                 const mode = interaction.options.getString('mode', true);
                 await setRankMode(guildId, mode);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Rank mode set to **${mode === 'all_whitelisted' ? 'All Whitelisted' : 'Whitelist Only'}**.`
-                });
+                }, true);
             }
 
             if (sub === 'whitelistadd') {
                 const channel = interaction.options.getChannel('channel', true);
                 await addWhitelistChannel(guildId, channel.id);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Added ${channel} to the XP whitelist.`
-                });
+                }, true);
             }
 
             if (sub === 'whitelistremove') {
                 const channel = interaction.options.getChannel('channel', true);
                 await removeWhitelistChannel(guildId, channel.id);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Removed ${channel} from the XP whitelist.`
-                });
+                }, true);
             }
 
             if (sub === 'blacklistadd') {
                 const channel = interaction.options.getChannel('channel', true);
                 await addBlacklistChannel(guildId, channel.id);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Added ${channel} to the XP blacklist.`
-                });
+                }, true);
             }
 
             if (sub === 'blacklistremove') {
                 const channel = interaction.options.getChannel('channel', true);
                 await removeBlacklistChannel(guildId, channel.id);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ Removed ${channel} from the XP blacklist.`
-                });
+                }, true);
             }
 
             if (sub === 'xpsettings') {
@@ -230,27 +231,27 @@ module.exports = {
                 const cooldown = interaction.options.getInteger('cooldown', true);
 
                 if (xpMin > xpMax) {
-                    return interaction.editReply({
+                    return safeReply(interaction,{
                         content: '❌ `xp_min` cannot be greater than `xp_max`.'
-                    });
+                    }, true);
                 }
 
                 await setRankXpConfig(guildId, xpMin, xpMax, cooldown);
 
-                return interaction.editReply({
+                return safeReply(interaction,{
                     content: `✅ XP settings updated to **${xpMin}-${xpMax} XP** with a **${cooldown}s** cooldown.`
-                });
+                }, true);
             }
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Unknown subcommand.'
-            });
+            }, true);
         } catch (error) {
             console.error('Ranks command error:', error);
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Something went wrong while running that command.'
-            });
+            }, true);
         }
     }
 };

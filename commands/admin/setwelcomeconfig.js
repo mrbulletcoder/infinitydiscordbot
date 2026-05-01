@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const defaultWelcome = {
     channel: null,
     title: '✨ A New Legend Has Arrived',
@@ -59,7 +61,6 @@ module.exports = {
 
     async executeSlash(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
 
             const guildId = interaction.guild.id;
 
@@ -72,11 +73,11 @@ module.exports = {
             const role = interaction.options.getRole('role');
 
             if (!channel && !messageText && !title && !color && !rules && !chat && !role) {
-                return interaction.editReply('⚠️ You must provide at least one setting to update.');
+                return safeReply(interaction,'⚠️ You must provide at least one setting to update.'), true;
             }
 
             if (color && !isHexColor(color)) {
-                return interaction.editReply('❌ Please provide a valid 6-digit hex color like `#00bfff`.');
+                return safeReply(interaction,'❌ Please provide a valid 6-digit hex color like `#00bfff`.');
             }
 
             const [rows] = await pool.query(
@@ -193,18 +194,18 @@ module.exports = {
                 })
                 .setTimestamp();
 
-            return interaction.editReply({ embeds: [preview] });
+            return safeReply(interaction,{ embeds: [preview] }, true);
         } catch (err) {
             console.error('setwelcomeconfig error:', err);
 
             if (interaction.deferred) {
-                return interaction.editReply('❌ Something went wrong while updating welcome settings.');
+                return safeReply(interaction,'❌ Something went wrong while updating welcome settings.'), true;
             }
 
-            return interaction.editReply({
+            return safeReply(interaction,{
                 content: '❌ Something went wrong while updating welcome settings.',
                 ephemeral: true
-            }).catch(() => { });
+            }, true).catch(() => { });
         }
     }
 };

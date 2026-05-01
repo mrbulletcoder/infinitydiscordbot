@@ -11,6 +11,8 @@ const {
     getCaseNoteCount
 } = require('../../utils/moderationDb');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
 
@@ -70,9 +72,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction);
-        if (!deferred) return;
-
         const caseNumber = interaction.options.getInteger('number', true);
         const note = interaction.options.getString('note', true).trim();
         const createdAt = Math.floor(Date.now() / 1000);
@@ -80,11 +79,11 @@ module.exports = {
         const existing = await getCaseByNumber(interaction.guild.id, caseNumber);
 
         if (!existing.ok) {
-            return interaction.editReply({ embeds: [errorEmbed('Failed to fetch that case.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('Failed to fetch that case.')] }, true);
         }
 
         if (!existing.rows.length) {
-            return interaction.editReply({ embeds: [errorEmbed(`Case #${caseNumber} was not found.`)] });
+            return safeReply(interaction, { embeds: [errorEmbed(`Case #${caseNumber} was not found.`)] }, true);
         }
 
         const noteResult = await addCaseNote(
@@ -96,7 +95,7 @@ module.exports = {
         );
 
         if (!noteResult.ok) {
-            return interaction.editReply({ embeds: [errorEmbed('Failed to add note to that case.')] });
+            return safeReply(interaction, { embeds: [errorEmbed('Failed to add note to that case.')] }, true);
         }
 
         const countResult = await getCaseNoteCount(interaction.guild.id, caseNumber);
@@ -111,30 +110,14 @@ module.exports = {
             })
             .setTitle(`📝 Internal Note Added • Case #${caseNumber}`)
             .addFields(
-                {
-                    name: '🛠️ Added By',
-                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
-                    inline: true
-                },
-                {
-                    name: '⚖️ Case Action',
-                    value: foundCase.action || 'Unknown',
-                    inline: true
-                },
-                {
-                    name: '📊 Total Notes',
-                    value: `\`${totalNotes}\``,
-                    inline: true
-                },
-                {
-                    name: '📄 Note',
-                    value: `> ${trimText(note, 1000)}`,
-                    inline: false
-                }
+                { name: '🛠️ Added By', value: `${interaction.user.tag}\n\`${interaction.user.id}\``, inline: true },
+                { name: '⚖️ Case Action', value: foundCase.action || 'Unknown', inline: true },
+                { name: '📊 Total Notes', value: `\`${totalNotes}\``, inline: true },
+                { name: '📄 Note', value: `> ${trimText(note, 1000)}`, inline: false }
             )
             .setFooter({ text: 'Infinity Moderation • Internal Case Note' })
             .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

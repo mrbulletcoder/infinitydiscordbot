@@ -1,8 +1,16 @@
 const { checkSlashPermission } = require('../../utils/checkPermissions');
-const { safeErrorReply, safeRun } = require('./safeReply');
+const { logError } = require('../../utils/errorHandler');
 
 function getCommandCooldown(command) {
     return Number(command.cooldown ?? 3);
+}
+
+async function respond(interaction, options) {
+    if (interaction.deferred || interaction.replied) {
+        return interaction.editReply(options);
+    }
+
+    return interaction.reply(options);
 }
 
 async function handleCommandCooldown(interaction, command) {
@@ -20,7 +28,11 @@ async function handleCommandCooldown(interaction, command) {
 
     if (expiresAt && now < expiresAt) {
         const remaining = ((expiresAt - now) / 1000).toFixed(1);
-        await safeErrorReply(interaction, `⏳ Please wait **${remaining}s** before using \`/${commandName}\` again.`);
+
+        await respond(interaction, {
+            content: `⏳ Please wait **${remaining}s** before using \`/${commandName}\` again.`
+        });
+
         return true;
     }
 
@@ -34,29 +46,60 @@ async function handleSlashCommand(interaction, client) {
     const command = client.commands.get(interaction.commandName);
 
     if (!command) {
-        return safeErrorReply(interaction, '❌ That command could not be found.');
+        return interaction.reply({
+            content: '❌ That command could not be found.',
+            flags: 64
+        });
     }
 
     if (typeof command.executeSlash !== 'function') {
-        console.error(`Command "${interaction.commandName}" is missing executeSlash().`);
-        return safeErrorReply(interaction, '❌ That command is not set up correctly.');
+        return interaction.reply({
+            content: '❌ That command is not set up correctly.',
+            flags: 64
+        });
     }
-
-    let allowed = false;
 
     try {
-        allowed = await checkSlashPermission(interaction, command);
+        await interaction.deferReply();
+
+        let allowed = false;
+
+        try {
+            allowed = await checkSlashPermission(interaction, command);
+        } catch (error) {
+            logError('SLASH PERMISSION', error, {
+                command: interaction.commandName,
+                user: `${interaction.user.tag} (${interaction.user.id})`,
+                guild: interaction.guild ? `${interaction.guild.name} (${interaction.guild.id})` : 'DM'
+            });
+
+            return respond(interaction, {
+                content: '❌ Failed to check permissions for that command.'
+            });
+        }
+
+        if (!allowed) {
+            return respond(interaction, {
+                content: '❌ You do not have permission to use this command.'
+            });
+        }
+
+        const isCoolingDown = await handleCommandCooldown(interaction, command);
+        if (isCoolingDown) return;
+
+        return command.executeSlash(interaction);
     } catch (error) {
-        console.error(`Permission check failed for /${interaction.commandName}:`, error);
-        return safeErrorReply(interaction, '❌ Failed to check permissions for that command.');
+        const errorId = logError('SLASH COMMAND', error, {
+            command: interaction.commandName,
+            user: `${interaction.user.tag} (${interaction.user.id})`,
+            guild: interaction.guild ? `${interaction.guild.name} (${interaction.guild.id})` : 'DM',
+            channel: interaction.channel ? `${interaction.channel.name} (${interaction.channel.id})` : 'Unknown'
+        });
+
+        return respond(interaction, {
+            content: `❌ Something went wrong while running this command.\nError ID: \`${errorId}\``
+        }).catch(() => null);
     }
-
-    if (!allowed) return;
-
-    const isCoolingDown = await handleCommandCooldown(interaction, command);
-    if (isCoolingDown) return;
-
-    return safeRun(interaction, `slash command /${interaction.commandName}`, () => command.executeSlash(interaction));
 }
 
 module.exports = { handleSlashCommand };

@@ -6,6 +6,8 @@ const {
     ButtonStyle
 } = require('discord.js');
 
+const { safeReply } = require('../../handlers/interactions/safeReply');
+
 // ===== STATUS =====
 function getPingStatus(ping) {
     if (ping < 120) return { text: 'Excellent', emoji: '🟢' };
@@ -64,7 +66,7 @@ function buildEmbed(client, apiLatency, messageLatency, wsPing) {
             },
             {
                 name: '🌐 WebSocket',
-                value: wsPing
+                value: wsPing !== null
                     ? `\`${wsPing}ms\`\n${createBar(wsPing)}`
                     : '`Calculating...`',
                 inline: true
@@ -107,9 +109,9 @@ module.exports = {
         const end = Date.now();
 
         const apiLatency = end - start;
-        const messageLatency = sent.createdTimestamp - message.createdTimestamp;
+        const messageLatency = end - message.createdTimestamp;
         const rawWs = message.client.ws.ping;
-        const wsPing = rawWs > 0 ? Math.round(rawWs) : null;
+        const wsPing = rawWs >= 0 ? Math.round(rawWs) : null;
 
         const embed = buildEmbed(message.client, apiLatency, messageLatency, wsPing);
 
@@ -129,21 +131,20 @@ module.exports = {
 
     // ===== SLASH =====
     async executeSlash(interaction) {
-        await interaction.deferReply({ ephemeral: true });
 
         const start = Date.now();
 
-        await interaction.editReply({
+        await safeReply(interaction,{
             content: '⏳ Calculating performance...',
             fetchReply: true
-        });
+        }, true);
 
         const end = Date.now();
 
         const apiLatency = end - start;
-        const messageLatency = Date.now() - start;
+        const messageLatency = Date.now() - interaction.createdTimestamp;
         const rawWs = interaction.client.ws.ping;
-        const wsPing = rawWs > 0 ? Math.round(rawWs) : null;
+        const wsPing = rawWs >= 0 ? Math.round(rawWs) : null;
 
         const embed = buildEmbed(interaction.client, apiLatency, messageLatency, wsPing);
 
@@ -154,10 +155,10 @@ module.exports = {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        await interaction.editReply({
+        await safeReply(interaction,{
             content: null,
             embeds: [embed],
             components: [button]
-        });
+        }, true);
     }
 };
