@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, addWallet, formatMoney, formatTime } = require('../../utils/economy');
 const { pool } = require('../../database');
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -19,7 +19,10 @@ module.exports = {
     description: 'Claim your daily economy reward.',
     usage: '!daily / /daily',
     category: 'economy',
-    cooldown: 3,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 86400,
 
     slashData: new SlashCommandBuilder()
         .setName('daily')

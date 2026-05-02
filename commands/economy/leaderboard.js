@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { pool } = require('../../database');
 const { formatMoney } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -17,6 +17,10 @@ module.exports = {
     usage: '!economy-leaderboard / /economy-leaderboard',
     category: 'economy',
     aliases: ['richest', 'moneylb', 'ecolb'],
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 15,
 
     slashData: new SlashCommandBuilder()
         .setName('economy-leaderboard')

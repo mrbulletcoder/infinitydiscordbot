@@ -6,7 +6,8 @@ const {
     StringSelectMenuBuilder,
     ModalBuilder,
     TextInputBuilder,
-    TextInputStyle
+    TextInputStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const {
@@ -29,6 +30,11 @@ module.exports = {
     description: 'Start a moderation appeal.',
     category: 'general',
     dmAllowed: true,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.SendMessages
+    ],
+    cooldown: 10,
 
     slashData: new SlashCommandBuilder()
         .setName('appeal')

@@ -1,6 +1,7 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder
+    EmbedBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { pool } = require('../../database');
@@ -123,6 +124,10 @@ module.exports = {
     description: 'View detailed information about a user.',
     usage: '!user-info [user] / /user-info [user]',
     category: 'general',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('user-info')
@@ -236,7 +241,7 @@ module.exports = {
                     value: '━━━━━━━━━━━━━━━━━━\n' + getRoleDisplay(member)
                 }
             )
-            .setFooter({ text: 'Infinity Bot • User Intelligence Suite ⚡' })
+            .setFooter({ text: 'Infinity Bot • User Intelligence ⚡' })
             .setTimestamp();
 
         const banner = fetchedUser.bannerURL({ dynamic: true, size: 1024 });

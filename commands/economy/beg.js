@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { addWallet, getUser, setCooldown, getRemaining, formatMoney, formatTime } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
@@ -8,6 +8,10 @@ module.exports = {
     name: 'beg',
     description: 'Beg for some coins.',
     category: 'economy',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 60,
 
     slashData: new SlashCommandBuilder()
         .setName('beg')

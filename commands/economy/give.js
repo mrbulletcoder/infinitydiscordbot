@@ -12,6 +12,11 @@ module.exports = {
     description: 'Give a user money (admin only).',
     usage: '/give user:<user> amount:<amount>',
     category: 'economy',
+    userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('give')

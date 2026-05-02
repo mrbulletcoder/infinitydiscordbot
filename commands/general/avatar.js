@@ -1,6 +1,7 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder
+    EmbedBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -45,6 +46,10 @@ module.exports = {
     description: 'View a user avatar in high quality.',
     usage: '!avatar [user] / /avatar [user]',
     category: 'general',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('avatar')

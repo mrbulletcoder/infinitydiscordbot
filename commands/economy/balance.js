@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, formatMoney } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
@@ -16,6 +16,10 @@ module.exports = {
     usage: '!balance [user] / /balance [user]',
     category: 'economy',
     aliases: ['bal', 'money'],
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('balance')

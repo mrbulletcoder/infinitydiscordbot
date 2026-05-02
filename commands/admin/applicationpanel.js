@@ -14,6 +14,11 @@ module.exports = {
     description: 'Send the application panel.',
     usage: '/applicationpanel',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks
+],
 
     slashData: new SlashCommandBuilder()
         .setName('applicationpanel')

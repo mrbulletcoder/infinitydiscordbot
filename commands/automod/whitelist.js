@@ -15,6 +15,10 @@ module.exports = {
     description: 'Manage users, roles, or channels that bypass automod.',
     usage: '/automod-whitelist type:<role|user|channel> action:<add|remove> <target>',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('automod-whitelist')
@@ -93,7 +97,7 @@ module.exports = {
         }
 
         if (!id) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ You must provide the correct option for the selected type.',
                 ephemeral: true
             }, true);
@@ -106,7 +110,7 @@ module.exports = {
             );
 
             if (existingRows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: '❌ That target is already whitelisted.',
                     ephemeral: true
                 }, true);
@@ -126,7 +130,7 @@ module.exports = {
             );
 
             if (!existingRows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: '❌ That target is not currently whitelisted.',
                     ephemeral: true
                 }, true);
@@ -148,6 +152,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

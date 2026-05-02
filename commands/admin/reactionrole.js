@@ -217,6 +217,13 @@ module.exports = {
     description: 'Create, manage, update, and send premium reaction role panels.',
     usage: '/reactionrole createcategory | editcategory | addrole | removerole | send | update | preview | info | list | clear | deletecategory',
     userPermissions: PermissionFlagsBits.ManageGuild,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ReadMessageHistory,
+    PermissionFlagsBits.AddReactions
+],
 
     slashData: new SlashCommandBuilder()
         .setName('reactionrole')

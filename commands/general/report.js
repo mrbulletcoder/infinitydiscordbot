@@ -391,7 +391,12 @@ module.exports = {
     description: 'Report a member to server staff.',
     usage: '!report @user <reason> / /report <user> <reason>',
     category: 'general',
-    cooldown: 10,
+    botPermissions: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 30,
 
     slashData: new SlashCommandBuilder()
         .setName('report')

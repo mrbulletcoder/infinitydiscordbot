@@ -1,7 +1,8 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    ChannelType
+    ChannelType,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -98,6 +99,10 @@ module.exports = {
     description: 'View detailed information about the server.',
     usage: '!server-stats / /server-stats',
     category: 'general',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 10,
 
     slashData: new SlashCommandBuilder()
         .setName('server-stats')
@@ -221,7 +226,7 @@ module.exports = {
                     inline: true
                 }
             )
-            .setFooter({ text: 'Infinity Bot • Server Intelligence Suite ⚡' })
+            .setFooter({ text: 'Infinity Bot • Server Intelligence ⚡' })
             .setTimestamp();
 
         if (guild.bannerURL()) {

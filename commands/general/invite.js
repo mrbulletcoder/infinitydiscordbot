@@ -3,19 +3,24 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
 const CLIENT_ID = '1485150070944043078'; // your bot ID
-const INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=1374658063382&scope=bot%20applications.commands`;
+const INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
 module.exports = {
     name: 'invite',
     description: 'Get the invite link for Infinity.',
     usage: '!invite / /invite',
     category: 'general',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('invite')

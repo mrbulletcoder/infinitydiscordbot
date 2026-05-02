@@ -24,6 +24,12 @@ module.exports = {
     description: 'Create and manage giveaways.',
     usage: '/giveaway create | edit | end | reroll | list | delete',
     userPermissions: PermissionFlagsBits.ManageGuild,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ReadMessageHistory
+],
 
     slashData: new SlashCommandBuilder()
         .setName('giveaway')

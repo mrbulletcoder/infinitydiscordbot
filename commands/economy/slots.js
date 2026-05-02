@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
     getUser,
     addWallet,
@@ -40,7 +40,11 @@ module.exports = {
     description: 'Play the slot machine and gamble your coins.',
     usage: '/slots <bet>',
     category: 'economy',
-    cooldown: 3,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.SendMessages
+    ],
+    cooldown: 30,
 
     slashData: new SlashCommandBuilder()
         .setName('slots')

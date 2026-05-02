@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
     getUser,
     addWallet,
@@ -20,7 +20,11 @@ module.exports = {
     description: 'Try to rob another user.',
     usage: '/rob user:<user>',
     category: 'economy',
-    cooldown: 3,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.SendMessages
+    ],
+    cooldown: 900,
 
     slashData: new SlashCommandBuilder()
         .setName('rob')

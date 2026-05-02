@@ -15,6 +15,11 @@ module.exports = {
     description: 'Send the ticket creation panel.',
     usage: '/ticketpanel',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks
+],
 
     slashData: new SlashCommandBuilder()
         .setName('ticketpanel')
@@ -33,7 +38,7 @@ module.exports = {
 
         const settings = rows[0];
         if (!settings?.panel_channel_id) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Ticket system is not configured yet. Use `/ticketconfig` first.',
                 ephemeral: true
             }, true);
@@ -44,7 +49,7 @@ module.exports = {
             await interaction.guild.channels.fetch(settings.panel_channel_id).catch(() => null);
 
         if (!panelChannel) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ The configured panel channel could not be found.',
                 ephemeral: true
             }, true);
@@ -77,12 +82,23 @@ module.exports = {
                 .setStyle(ButtonStyle.Primary)
         );
 
+        const botMember = interaction.guild.members.me;
+        const perms = panelChannel.permissionsFor(botMember);
+
+        if (!perms?.has(PermissionFlagsBits.ViewChannel) ||
+            !perms?.has(PermissionFlagsBits.SendMessages) ||
+            !perms?.has(PermissionFlagsBits.EmbedLinks)) {
+            return safeReply(interaction, {
+                content: '❌ I do not have permission to send the ticket panel in that channel. I need **View Channel**, **Send Messages**, and **Embed Links**.'
+            }, true);
+        }
+
         await panelChannel.send({
             embeds: [embed],
             components: [row]
         });
 
-        return safeReply(interaction,{
+        return safeReply(interaction, {
             content: `✅ Ticket panel sent to ${panelChannel}.`,
             ephemeral: true
         }, true);

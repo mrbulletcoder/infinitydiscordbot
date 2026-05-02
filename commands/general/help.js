@@ -4,7 +4,8 @@ const {
     SlashCommandBuilder,
     EmbedBuilder,
     ActionRowBuilder,
-    StringSelectMenuBuilder
+    StringSelectMenuBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -210,6 +211,10 @@ module.exports = {
     name: 'help',
     description: 'View a list of all available commands.',
     usage: '!help [command] / /help [command]',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('help')

@@ -3,7 +3,8 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -96,6 +97,8 @@ module.exports = {
     description: 'Check bot performance stats',
     usage: '!ping, /ping',
     category: 'general',
+    botPermissions: [],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('ping')

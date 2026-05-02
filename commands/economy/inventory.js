@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
     getInventory,
     getShopItem
@@ -11,6 +11,10 @@ module.exports = {
     usage: '/inventory [user]',
     category: 'economy',
     aliases: ['inv'],
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('inventory')

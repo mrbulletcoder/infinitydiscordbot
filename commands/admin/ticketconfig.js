@@ -13,6 +13,13 @@ module.exports = {
     description: 'Configure the ticket system.',
     usage: '/ticketconfig category:<category> panel:<channel> transcripts:<channel> support:<role>',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.ManageChannels,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks,
+    PermissionFlagsBits.ReadMessageHistory
+],
 
     slashData: new SlashCommandBuilder()
         .setName('ticketconfig')

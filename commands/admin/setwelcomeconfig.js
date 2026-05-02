@@ -22,6 +22,11 @@ module.exports = {
     description: 'Configure the server’s welcome system, including the welcome channel and message sent when a new member joins.',
     usage: '/setwelcomeconfig channel:<#channel> message:<text>',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks
+],
 
     slashData: new SlashCommandBuilder()
         .setName('setwelcomeconfig')

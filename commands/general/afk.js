@@ -1,6 +1,7 @@
 const {
     SlashCommandBuilder,
-    EmbedBuilder
+    EmbedBuilder,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { pool } = require('../../database');
@@ -12,6 +13,10 @@ module.exports = {
     description: 'Set your AFK status.',
     usage: '!afk [reason] / /afk [reason]',
     category: 'general',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('afk')

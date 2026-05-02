@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
     getUser,
     removeWallet,
@@ -14,6 +14,10 @@ module.exports = {
     description: 'Buy an item from the economy shop.',
     usage: '/buy item:<item_id> quantity:<amount>',
     category: 'economy',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('buy')

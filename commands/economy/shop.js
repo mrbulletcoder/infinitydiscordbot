@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getShopItems, formatMoney } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
@@ -7,6 +7,10 @@ module.exports = {
     description: 'View the economy shop.',
     usage: '/shop',
     category: 'economy',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('shop')

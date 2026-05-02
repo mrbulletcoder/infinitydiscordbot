@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { addWallet, removeWallet, getUser, setCooldown, getRemaining, formatMoney, formatTime } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
@@ -8,6 +8,10 @@ module.exports = {
     name: 'crime',
     description: 'Commit a crime for big rewards (or lose money).',
     category: 'economy',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 180,
 
     slashData: new SlashCommandBuilder()
         .setName('crime')

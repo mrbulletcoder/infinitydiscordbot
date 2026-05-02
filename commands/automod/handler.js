@@ -22,6 +22,10 @@ module.exports = {
     description: 'Configure and manage the server’s automod settings.',
     usage: '/automod',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('automod')
@@ -80,7 +84,7 @@ module.exports = {
                 .setFooter({ text: 'Infinity AutoMod System' })
                 .setTimestamp();
 
-            return safeReply(interaction,{ embeds: [embed] }, true);
+            return safeReply(interaction, { embeds: [embed] }, true);
         }
 
         const fieldMap = {
@@ -108,6 +112,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

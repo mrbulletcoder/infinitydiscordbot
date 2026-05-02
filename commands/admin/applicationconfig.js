@@ -13,6 +13,11 @@ module.exports = {
     description: 'Configure the applications system.',
     usage: '/applicationconfig panel:<channel> review:<channel> cooldown:<hours>',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks
+],
 
     slashData: new SlashCommandBuilder()
         .setName('applicationconfig')

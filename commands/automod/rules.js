@@ -28,6 +28,10 @@ module.exports = {
     description: 'Edit automod rules such as spam, links, and caps.',
     usage: '/automod-rules type:<spam|links|caps|all> offense:<number> action:<warn|timeout|kick> [duration]',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 10,
 
     slashData: new SlashCommandBuilder()
         .setName('automod-rules')
@@ -78,7 +82,7 @@ module.exports = {
         const types = type === 'all' ? ['spam', 'links', 'caps'] : [type];
 
         if (action === 'timeout' && !duration) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ You must provide a duration in seconds for timeout.',
                 ephemeral: true
             }, true);
@@ -113,6 +117,6 @@ module.exports = {
             .setFooter({ text: 'Infinity AutoMod System' })
             .setTimestamp();
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

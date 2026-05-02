@@ -1,8 +1,19 @@
 const { checkSlashPermission } = require('../../utils/checkPermissions');
 const { logError } = require('../../utils/errorHandler');
+const { safeReply } = require('./safeReply');
 
 function getCommandCooldown(command) {
     return Number(command.cooldown ?? 3);
+}
+
+function formatCooldown(ms) {
+    const seconds = Math.ceil(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
 }
 
 async function respond(interaction, options) {
@@ -27,11 +38,11 @@ async function handleCommandCooldown(interaction, command) {
     const expiresAt = cooldowns.get(key);
 
     if (expiresAt && now < expiresAt) {
-        const remaining = ((expiresAt - now) / 1000).toFixed(1);
+        const remainingMs = expiresAt - now;
 
-        await respond(interaction, {
-            content: `⏳ Please wait **${remaining}s** before using \`/${commandName}\` again.`
-        });
+        await safeReply(interaction, {
+            content: `⏳ You are on cooldown.\nPlease wait **${formatCooldown(remainingMs)}** before using \`/${interaction.commandName}\` again.`
+        }, true);
 
         return true;
     }

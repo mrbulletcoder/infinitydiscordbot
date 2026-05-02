@@ -165,6 +165,10 @@ module.exports = {
     description: 'View current automod rules and punishments.',
     usage: '/automod-view',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('automod-view')
@@ -224,7 +228,7 @@ module.exports = {
                     .setDisabled(true)
             );
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 embeds: [emptyEmbed],
                 components: [emptyRow],
                 ephemeral: true
@@ -257,7 +261,7 @@ module.exports = {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        return safeReply(interaction,{
+        return safeReply(interaction, {
             embeds: [embed],
             components: [row]
         }, true);

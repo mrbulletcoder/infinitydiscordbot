@@ -18,6 +18,11 @@ module.exports = {
     description: 'Configure Infinity advanced server logging.',
     usage: '/logging setup | status | enable | disable | ignore | unignore',
     userPermissions: PermissionFlagsBits.Administrator,
+    botPermissions: [
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+    PermissionFlagsBits.EmbedLinks
+],
     slashData: new SlashCommandBuilder()
         .setName('logging')
         .setDescription('Configure advanced server logging')

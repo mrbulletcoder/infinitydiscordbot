@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, formatMoney } = require('../../utils/economy');
 const { pool } = require('../../database');
 const { safeReply } = require('../../handlers/interactions/safeReply');
@@ -7,6 +7,10 @@ module.exports = {
     name: 'withdraw',
     description: 'Withdraw money from your bank.',
     category: 'economy',
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 5,
 
     slashData: new SlashCommandBuilder()
         .setName('withdraw')

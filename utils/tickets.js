@@ -135,6 +135,16 @@ async function handleCreateTicket(interaction) {
             });
         }
 
+        const botMember = interaction.guild.members.me;
+        const categoryPerms = category.permissionsFor(botMember);
+
+        if (!categoryPerms?.has(PermissionFlagsBits.ViewChannel) ||
+            !categoryPerms?.has(PermissionFlagsBits.ManageChannels)) {
+            return interaction.editReply({
+                content: '❌ I do not have permission to create ticket channels in the ticket category. I need **View Channel** and **Manage Channels**.'
+            });
+        }
+
         const tempChannel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20),
             type: ChannelType.GuildText,
@@ -194,7 +204,7 @@ async function handleCreateTicket(interaction) {
         const ticketId = insertResult.insertId;
         const betterName = buildTicketName(ticketId, interaction.user.username);
 
-        await tempChannel.setName(betterName).catch(() => {});
+        await tempChannel.setName(betterName).catch(() => { });
 
         const embed = new EmbedBuilder()
             .setAuthor({
@@ -242,13 +252,13 @@ async function handleCreateTicket(interaction) {
         if (interaction.deferred || interaction.replied) {
             return interaction.editReply({
                 content: '❌ Failed to create ticket.'
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         return interaction.reply({
             content: '❌ Failed to create ticket.',
             ephemeral: true
-        }).catch(() => {});
+        }).catch(() => { });
     }
 }
 
@@ -339,13 +349,13 @@ async function handleClaimTicket(interaction, ticketId) {
             return interaction.followUp({
                 content: '❌ Failed to claim ticket.',
                 ephemeral: true
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         return interaction.reply({
             content: '❌ Failed to claim ticket.',
             ephemeral: true
-        }).catch(() => {});
+        }).catch(() => { });
     }
 }
 
@@ -422,7 +432,7 @@ async function handleCloseTicket(interaction, ticketId) {
         return interaction.reply({
             content: '❌ Failed to start ticket close process.',
             ephemeral: true
-        }).catch(() => {});
+        }).catch(() => { });
     }
 }
 
@@ -500,7 +510,7 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
 
         const transcriptChannel = settings?.transcript_channel_id
             ? interaction.guild.channels.cache.get(settings.transcript_channel_id) ||
-              await interaction.guild.channels.fetch(settings.transcript_channel_id).catch(() => null)
+            await interaction.guild.channels.fetch(settings.transcript_channel_id).catch(() => null)
             : null;
 
         if (transcriptChannel) {
@@ -530,13 +540,13 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
         if (interaction.deferred || interaction.replied) {
             return interaction.editReply({
                 content: '❌ Failed to close ticket.'
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         return interaction.reply({
             content: '❌ Failed to close ticket.',
             ephemeral: true
-        }).catch(() => {});
+        }).catch(() => { });
     }
 }
 

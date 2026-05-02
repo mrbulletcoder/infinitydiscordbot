@@ -26,9 +26,20 @@ module.exports = (client) => {
                 try {
                     await event.execute(...args, client);
                 } catch (error) {
+                    const interaction = args.find(arg => arg?.guild && arg?.user);
+
                     logError('EVENT', error, {
                         event: event.name,
-                        file
+                        file,
+                        guild: interaction?.guild
+                            ? `${interaction.guild.name} (${interaction.guild.id})`
+                            : 'Unknown',
+                        channel: interaction?.channel
+                            ? `${interaction.channel.name} (${interaction.channel.id})`
+                            : 'Unknown',
+                        user: interaction?.user
+                            ? `${interaction.user.tag} (${interaction.user.id})`
+                            : 'Unknown'
                     });
                 }
             };

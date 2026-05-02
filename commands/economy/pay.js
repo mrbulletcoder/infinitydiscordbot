@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, removeWallet, addWallet, formatMoney } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
@@ -15,7 +15,10 @@ module.exports = {
     description: 'Pay another user coins.',
     usage: '!pay @user <amount> / /pay user amount',
     category: 'economy',
-    cooldown: 3,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 10,
 
     slashData: new SlashCommandBuilder()
         .setName('pay')
