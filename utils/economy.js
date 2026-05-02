@@ -92,6 +92,66 @@ function formatTime(ms) {
     return `${seconds}s`;
 }
 
+const SHOP_ITEMS = [
+    {
+        id: 'lucky_charm',
+        name: 'Lucky Charm',
+        emoji: '🍀',
+        price: 2500,
+        description: 'A shiny charm that may bring luck.'
+    },
+    {
+        id: 'bank_shield',
+        name: 'Bank Shield',
+        emoji: '🛡️',
+        price: 5000,
+        description: 'A protective item for rob/bank protection systems.'
+    },
+    {
+        id: 'gold_ring',
+        name: 'Gold Ring',
+        emoji: '💍',
+        price: 10000,
+        description: 'A flex item to show off your wealth.'
+    },
+    {
+        id: 'vip_crown',
+        name: 'VIP Crown',
+        emoji: '👑',
+        price: 25000,
+        description: 'A premium flex item for rich members.'
+    }
+];
+
+function getShopItems() {
+    return SHOP_ITEMS;
+}
+
+function getShopItem(itemId) {
+    return SHOP_ITEMS.find(item => item.id === itemId);
+}
+
+async function addInventoryItem(guildId, userId, itemId, quantity = 1) {
+    await pool.query(
+        `INSERT INTO economy_inventory (guild_id, user_id, item_id, quantity)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`,
+        [guildId, userId, itemId, quantity]
+    );
+}
+
+async function getInventory(guildId, userId) {
+    const [rows] = await pool.query(
+        `SELECT item_id, quantity
+         FROM economy_inventory
+         WHERE guild_id = ? AND user_id = ?
+         ORDER BY item_id ASC`,
+        [guildId, userId]
+    );
+
+    return rows;
+}
+
 module.exports = {
     COIN,
     formatMoney,
@@ -101,5 +161,9 @@ module.exports = {
     removeWallet,
     setCooldown,
     getRemaining,
-    formatTime
+    formatTime,
+    getShopItems,
+    getShopItem,
+    addInventoryItem,
+    getInventory
 };

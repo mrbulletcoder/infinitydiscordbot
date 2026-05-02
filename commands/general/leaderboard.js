@@ -20,12 +20,11 @@ module.exports = {
         .setDescription('View the server rank leaderboard'),
 
     async executeSlash(interaction) {
-
         try {
             const rows = await getLeaderboard(interaction.guild.id, 10, 0);
 
             if (!rows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: '❌ No leaderboard data exists for this server yet.'
                 }, true);
             }
@@ -48,7 +47,7 @@ module.exports = {
             }
 
             if (!leaderboardRows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: '❌ No leaderboard data exists for this server yet.'
                 }, true);
             }
@@ -58,13 +57,13 @@ module.exports = {
                 leaderboardRows
             });
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 files: [attachment]
             }, true);
         } catch (error) {
             console.error('Leaderboard command error:', error);
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Something went wrong while loading the leaderboard.'
             }, true);
         }

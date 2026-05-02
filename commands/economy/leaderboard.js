@@ -3,9 +3,9 @@ const { pool } = require('../../database');
 const { formatMoney } = require('../../utils/economy');
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
-async function respond(ctx, options) {
-    if (ctx.deferred || ctx.replied) {
-        return ctx.editReply(options);
+function respond(ctx, options) {
+    if (ctx.user) {
+        return safeReply(ctx, options, true);
     }
 
     return ctx.reply(options);

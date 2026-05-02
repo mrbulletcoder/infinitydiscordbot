@@ -441,7 +441,6 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-
         const targetUser = interaction.options.getUser('user', true);
         const reason = interaction.options.getString('reason', true).trim();
 
@@ -456,31 +455,29 @@ module.exports = {
     },
 
     async handleReport({ ctx, guild, reporter, target, reason, isSlash = false }) {
-        if (!guild) {
-            const content = '❌ This command can only be used in a server.';
+
+        const reply = (payload) => {
             return isSlash
-                ? ctx.editReply({ content })
-                : ctx.editReply(content);
+                ? safeReply(ctx, payload, true)
+                : ctx.reply(payload);
+        };
+
+        if (!guild) {
+            return reply({ content: '❌ This command can only be used in a server.' });
         }
 
         if (target.id === reporter.id) {
-            return isSlash
-                ? ctx.editReply({ content: '❌ You cannot report yourself.' })
-                : ctx.editReply('❌ You cannot report yourself.');
+            return reply({ content: '❌ You cannot report yourself.' });
         }
 
         if (target.bot) {
-            return isSlash
-                ? ctx.editReply({ content: '❌ You cannot report a bot.' })
-                : ctx.editReply('❌ You cannot report a bot.');
+            return reply({ content: '❌ You cannot report a bot.' });
         }
 
         const member = await guild.members.fetch(target.id).catch(() => null);
 
         if (!member) {
-            return isSlash
-                ? ctx.editReply({ content: '❌ That user is not in this server.' })
-                : ctx.editReply('❌ That user is not in this server.');
+            return reply({ content: '❌ That user is not in this server.' });
         }
 
         const cooldown = await checkReportCooldown(guild.id, reporter.id);
@@ -491,9 +488,7 @@ module.exports = {
                 `You can report again in **${cooldown.remainingText}**.\n` +
                 `Cooldown ends: <t:${Math.floor(cooldown.expiresAt / 1000)}:R>`;
 
-            return isSlash
-                ? ctx.editReply({ content: text })
-                : ctx.editReply(text);
+            return reply({ content: text });
         }
 
         const spamCheck = checkReportSpam(guild.id, reporter.id, target.id);
@@ -504,9 +499,7 @@ module.exports = {
                     `⚠️ You have already reported this user recently.\n` +
                     `Please wait **${formatDuration(spamCheck.remainingMs)}** before reporting them again.`;
 
-                return isSlash
-                    ? ctx.editReply({ content: text })
-                    : ctx.editReply(text);
+                return reply({ content: text });
             }
 
             if (spamCheck.type === 'burst') {
@@ -514,9 +507,7 @@ module.exports = {
                     `⚠️ You are sending reports too quickly.\n` +
                     `Please wait **${formatDuration(spamCheck.remainingMs)}** before submitting more reports.`;
 
-                return isSlash
-                    ? ctx.editReply({ content: text })
-                    : ctx.editReply(text);
+                return reply({ content: text });
             }
         }
 
@@ -528,9 +519,7 @@ module.exports = {
         });
 
         if (!reportRecord.ok) {
-            return isSlash
-                ? ctx.editReply({ content: '❌ Failed to create report.' })
-                : ctx.editReply('❌ Failed to create report.');
+            return reply({ content: '❌ Failed to create report.' });
         }
 
         registerReportSpamEntry(guild.id, reporter.id, target.id);
@@ -568,8 +557,6 @@ module.exports = {
 
         const successEmbed = buildReporterSuccessEmbed(target, reason, caseNumber);
 
-        return isSlash
-            ? ctx.editReply({ embeds: [successEmbed] })
-            : ctx.editReply({ embeds: [successEmbed] });
+        return reply({ embeds: [successEmbed] });
     }
 };

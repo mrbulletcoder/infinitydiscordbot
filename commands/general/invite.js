@@ -26,11 +26,10 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-
-        return this.sendInvite(interaction);
+        return this.sendInvite(interaction, true);
     },
 
-    async sendInvite(ctx) {
+    async sendInvite(ctx, isSlash = false) {
         const embed = new EmbedBuilder()
             .setColor('#00bfff')
             .setTitle('🚀 Invite Infinity')
@@ -61,7 +60,10 @@ module.exports = {
         );
 
         if (isSlash) {
-            return safeReply(ctx, { embeds: [embed] }, true);
+            return safeReply(ctx, {
+                embeds: [embed],
+                components: [row]
+            }, true);
         }
 
         return ctx.reply({

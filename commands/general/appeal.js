@@ -39,8 +39,6 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-
-        // DM flow
         if (!interaction.guild) {
             const eligibleGuilds = await getAppealEligibleGuildsForUser(
                 interaction.client,
@@ -69,9 +67,7 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor('#00bfff')
                 .setTitle('📨 Start an Appeal')
-                .setDescription(
-                    'Select the server where the moderation case happened.\n\nAfter that, I will show you the cases you can appeal.'
-                )
+                .setDescription('Select the server where the moderation case happened.\n\nAfter that, I will show you the cases you can appeal.')
                 .setFooter({ text: 'Infinity Appeals' })
                 .setTimestamp();
 
@@ -81,7 +77,6 @@ module.exports = {
             }, true);
         }
 
-        // Guild flow
         const result = await getAppealableCasesForUser(
             interaction.guild.id,
             interaction.user.id,
@@ -89,13 +84,13 @@ module.exports = {
         );
 
         if (!result.ok) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Failed to load your cases.'
             }, true);
         }
 
         if (!result.rows.length) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ You do not have any appealable cases in this server.'
             }, true);
         }
@@ -113,7 +108,7 @@ module.exports = {
                 .addOptions(options)
         );
 
-        return safeReply(interaction,{
+        return safeReply(interaction, {
             content: 'Select the case you want to appeal.',
             components: [row]
         }, true);

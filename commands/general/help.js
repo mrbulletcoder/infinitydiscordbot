@@ -241,7 +241,9 @@ module.exports = {
             const cmd = interaction.client.commands.get(commandName);
 
             if (!cmd) {
-                return safeReply(interaction, { content: '❌ Command not found.' }, true);
+                return safeReply(interaction, {
+                    content: '❌ Command not found.'
+                }, true);
             }
 
             return safeReply(interaction, {
@@ -259,7 +261,7 @@ async function sendHelp(ctx, client, isSlash = false) {
     const menu = createHelpMenu(categories, 'overview');
 
     if (isSlash) {
-        return ctx.editReply({ embeds: [embed], components: [menu] });
+        return safeReply(ctx, { embeds: [embed], components: [menu] }, true);
     }
 
     return ctx.reply({ embeds: [embed], components: [menu] });

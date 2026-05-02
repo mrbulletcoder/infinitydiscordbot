@@ -1,8 +1,7 @@
 const {
     SlashCommandBuilder,
     EmbedBuilder,
-    PermissionFlagsBits,
-    MessageFlags
+    PermissionFlagsBits
 } = require('discord.js');
 
 const {
@@ -33,22 +32,6 @@ function errorEmbed(description) {
         .setColor(ERROR_COLOR)
         .setDescription(`❌ ${description}`)
         .setTimestamp();
-}
-
-async function safeDefer(interaction) {
-    if (interaction.deferred || interaction.replied) return true;
-
-    try {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        return true;
-    } catch (error) {
-        if (error.code === 10062) {
-            console.error('Cases command interaction expired before deferReply.');
-            return false;
-        }
-
-        throw error;
-    }
 }
 
 function buildCasesEmbed({ title, iconURL, rows, modeLabel, guild }) {
@@ -143,8 +126,6 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction);
-        if (!deferred) return;
 
         const targetUser = interaction.options.getUser('user');
         const targetModerator = interaction.options.getUser('moderator');
@@ -155,15 +136,15 @@ module.exports = {
         const filtersUsed = [targetUser, targetModerator, action, recent].filter(Boolean).length;
 
         if (filtersUsed === 0) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 embeds: [errorEmbed('Choose one filter: user, moderator, action, or recent.')]
-            });
+            }, true);
         }
 
         if (filtersUsed > 1) {
-            return interaction.editReply({
+            return safeReply(interaction,{
                 embeds: [errorEmbed('Use only one filter at a time.')]
-            });
+            }, true);
         }
 
         let result;
@@ -173,15 +154,15 @@ module.exports = {
             result = await getCasesForUser(interaction.guild.id, targetUser.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('Failed to fetch case history.')]
-                });
+                }, true);
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('No case history found for that user.')]
-                });
+                }, true);
             }
 
             embed = buildCasesEmbed({
@@ -195,15 +176,15 @@ module.exports = {
             result = await getCasesByModerator(interaction.guild.id, targetModerator.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('Failed to fetch moderator cases.')]
-                });
+                }, true);
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('No cases found for that moderator.')]
-                });
+                }, true);
             }
 
             embed = buildCasesEmbed({
@@ -217,15 +198,15 @@ module.exports = {
             result = await getCasesByAction(interaction.guild.id, action, limit);
 
             if (!result.ok) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('Failed to fetch action-filtered cases.')]
-                });
+                }, true);
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed(`No ${action.toLowerCase()} cases found.`)]
-                });
+                }, true);
             }
 
             embed = buildCasesEmbed({
@@ -239,15 +220,15 @@ module.exports = {
             result = await getRecentCases(interaction.guild.id, limit);
 
             if (!result.ok) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('Failed to fetch recent cases.')]
-                });
+                }, true);
             }
 
             if (!result.rows.length) {
-                return interaction.editReply({
+                return safeReply(interaction,{
                     embeds: [errorEmbed('No recent cases found.')]
-                });
+                }, true);
             }
 
             embed = buildCasesEmbed({
@@ -259,6 +240,6 @@ module.exports = {
             });
         }
 
-        return interaction.editReply({ embeds: [embed] });
+        return safeReply(interaction,{ embeds: [embed] }, true);
     }
 };

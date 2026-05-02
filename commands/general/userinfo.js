@@ -149,28 +149,29 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        return this.sendInfo(interaction, interaction.guild, targetUser, member);
+        return this.sendInfo(interaction, interaction.guild, targetUser, member, true);
     },
 
-    async sendInfo(ctx, guild, user, member) {
+    async sendInfo(ctx, guild, user, member, isSlash = false) {
+
+        const reply = (payload) => {
+            return isSlash
+                ? safeReply(ctx, payload, true)
+                : ctx.reply(payload);
+        };
+
         if (!guild) {
-            const content = '❌ This command can only be used in a server.';
-
-            if (ctx.editReply) {
-                return ctx.editReply({ content });
-            }
-
-            return;
+            return reply({ content: '❌ This command can only be used in a server.' });
         }
 
         const fetchedUser = await user.fetch(true).catch(() => user);
         const warningCount = await getWarningCount(guild.id, fetchedUser.id);
         const joinPosition = await getJoinPosition(guild, fetchedUser.id);
         const status = member?.presence?.status || 'offline';
+
         const topRole = member?.roles?.highest && member.roles.highest.name !== '@everyone'
             ? member.roles.highest.toString()
             : '`None`';
@@ -191,21 +192,17 @@ module.exports = {
                         `**Tag:** ${fetchedUser.tag}\n` +
                         `**User ID:** \`${fetchedUser.id}\`\n` +
                         `**Bot Account:** \`${fetchedUser.bot ? 'Yes' : 'No'}\`\n` +
-                        `**Status:** ${getStatusText(status)}`,
-                    inline: false
+                        `**Status:** ${getStatusText(status)}`
                 },
                 {
                     name: '📅 Account Created',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${formatFullDate(fetchedUser.createdAt)}`,
+                    value: '━━━━━━━━━━━━━━━━━━\n' + formatFullDate(fetchedUser.createdAt),
                     inline: true
                 },
                 {
                     name: '📥 Joined Server',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${member?.joinedAt ? formatFullDate(member.joinedAt) : '`Not available`'}`,
+                    value: '━━━━━━━━━━━━━━━━━━\n' +
+                        (member?.joinedAt ? formatFullDate(member.joinedAt) : '`Not available`'),
                     inline: true
                 },
                 {
@@ -226,34 +223,25 @@ module.exports = {
                 },
                 {
                     name: '🏅 Badges',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${getBadges(fetchedUser, member, guild)}`,
+                    value: '━━━━━━━━━━━━━━━━━━\n' + getBadges(fetchedUser, member, guild),
                     inline: true
                 },
                 {
                     name: '🛡️ Key Permissions',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${getKeyPermissions(member)}`,
+                    value: '━━━━━━━━━━━━━━━━━━\n' + getKeyPermissions(member),
                     inline: true
                 },
                 {
                     name: '🎭 Role Collection',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${getRoleDisplay(member)}`,
-                    inline: false
+                    value: '━━━━━━━━━━━━━━━━━━\n' + getRoleDisplay(member)
                 }
             )
             .setFooter({ text: 'Infinity Bot • User Intelligence Suite ⚡' })
             .setTimestamp();
 
         const banner = fetchedUser.bannerURL({ dynamic: true, size: 1024 });
-        if (banner) {
-            embed.setImage(banner);
-        }
+        if (banner) embed.setImage(banner);
 
-        return ctx.editReply({ embeds: [embed] });
+        return reply({ embeds: [embed] });
     }
 };

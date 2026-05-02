@@ -131,10 +131,9 @@ module.exports = {
 
     // ===== SLASH =====
     async executeSlash(interaction) {
-
         const start = Date.now();
 
-        await safeReply(interaction,{
+        await safeReply(interaction, {
             content: '⏳ Calculating performance...',
             fetchReply: true
         }, true);
@@ -155,7 +154,7 @@ module.exports = {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        await safeReply(interaction,{
+        return safeReply(interaction, {
             content: null,
             embeds: [embed],
             components: [button]

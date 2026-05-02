@@ -108,19 +108,18 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-
-        return this.sendStats(interaction, interaction.guild);
+        return this.sendStats(interaction, interaction.guild, true);
     },
 
-    async sendStats(ctx, guild) {
+    async sendStats(ctx, guild, isSlash = false) {
+        const reply = payload => {
+            return isSlash
+                ? safeReply(ctx, payload, true)
+                : ctx.reply(payload);
+        };
+
         if (!guild) {
-            const content = '❌ This command can only be used in a server.';
-
-            if (ctx.editReply) {
-                return ctx.editReply({ content });
-            }
-
-            return;
+            return reply({ content: '❌ This command can only be used in a server.' });
         }
 
         await guild.fetch();
@@ -229,6 +228,6 @@ module.exports = {
             embed.setImage(guild.bannerURL({ size: 1024 }));
         }
 
-        return ctx.editReply({ embeds: [embed] });
+        return reply({ embeds: [embed] });
     }
 };

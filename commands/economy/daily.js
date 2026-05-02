@@ -6,9 +6,9 @@ const { safeReply } = require('../../handlers/interactions/safeReply');
 const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
 const BASE_REWARD = 1000;
 
-async function respond(ctx, options) {
-    if (ctx.deferred || ctx.replied) {
-        return ctx.editReply(options);
+function respond(ctx, options) {
+    if (ctx.user) {
+        return safeReply(ctx, options, true);
     }
 
     return ctx.reply(options);

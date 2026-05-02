@@ -71,14 +71,13 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        return this.sendAvatar(interaction, targetUser, member);
+        return this.sendAvatar(interaction, targetUser, member, true);
     },
 
-    async sendAvatar(ctx, user, member) {
+    async sendAvatar(ctx, user, member, isSlash = false) {
         const fetchedUser = await user.fetch(true).catch(() => user);
         const links = getAvatarLinks(fetchedUser, member);
 

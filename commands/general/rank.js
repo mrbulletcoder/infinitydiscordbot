@@ -25,12 +25,11 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-
         try {
             const targetUser = interaction.options.getUser('user') || interaction.user;
 
             if (targetUser.bot) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: '❌ Bots do not have rank data.'
                 }, true);
             }
@@ -45,13 +44,13 @@ module.exports = {
                 rankData
             });
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 files: [attachment]
             }, true);
         } catch (error) {
             console.error('Rank command error:', error);
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Something went wrong while loading that rank card.'
             }, true);
         }

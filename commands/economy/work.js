@@ -13,9 +13,9 @@ const jobs = [
     { name: 'Streamer', min: 250, max: 1500 }
 ];
 
-async function respond(ctx, options) {
-    if (ctx.deferred || ctx.replied) {
-        return ctx.editReply(options);
+function respond(ctx, options) {
+    if (ctx.user) {
+        return safeReply(ctx, options, true);
     }
 
     return ctx.reply(options);
