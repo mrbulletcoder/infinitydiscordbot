@@ -1,5 +1,10 @@
 const { pool } = require('../database');
 const { sendAdvancedLog } = require('./advancedLogger');
+const { safeReply } = require('../handlers/interactions/safeReply');
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function normaliseUser(value) {
     return value?.user || value || null;

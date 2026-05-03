@@ -1,8 +1,13 @@
 const { AttachmentBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const xpCooldownCache = new Map();
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function xpForLevel(level) {
     return 5 * (level ** 2) + (50 * level) + 100;

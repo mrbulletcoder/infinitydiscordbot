@@ -8,8 +8,13 @@ const {
     AttachmentBuilder
 } = require('discord.js');
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const createCooldown = new Map();
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 async function getTicketSettings(guildId) {
     const [rows] = await pool.query(
@@ -94,22 +99,19 @@ async function handleCreateTicket(interaction) {
         const existingCooldown = createCooldown.get(cooldownKey);
 
         if (existingCooldown && now - existingCooldown < 5000) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ Please wait a few seconds before creating another ticket.',
-                ephemeral: true
-            });
+            }, true);
         }
 
         createCooldown.set(cooldownKey, now);
 
-        await interaction.deferReply({ ephemeral: true });
-
         const settings = await getTicketSettings(interaction.guild.id);
 
         if (!settings?.category_id || !settings?.transcript_channel_id) {
-            return interaction.editReply({
+            return reply(interaction, {
                 content: '❌ The ticket system is not configured yet.'
-            });
+            }, true);
         }
 
         const existing = await getOpenTicketByUser(interaction.guild.id, interaction.user.id);
@@ -118,11 +120,11 @@ async function handleCreateTicket(interaction) {
                 interaction.guild.channels.cache.get(existing.channel_id) ||
                 await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
 
-            return interaction.editReply({
+            return reply(interaction, {
                 content: existingChannel
                     ? `❌ You already have an open ticket: ${existingChannel}`
                     : '❌ You already have an open ticket.'
-            });
+            }, true);
         }
 
         const category =
@@ -130,9 +132,9 @@ async function handleCreateTicket(interaction) {
             await interaction.guild.channels.fetch(settings.category_id).catch(() => null);
 
         if (!category || category.type !== ChannelType.GuildCategory) {
-            return interaction.editReply({
+            return reply(interaction, {
                 content: '❌ The configured ticket category is invalid.'
-            });
+            }, true);
         }
 
         const botMember = interaction.guild.members.me;
@@ -140,9 +142,9 @@ async function handleCreateTicket(interaction) {
 
         if (!categoryPerms?.has(PermissionFlagsBits.ViewChannel) ||
             !categoryPerms?.has(PermissionFlagsBits.ManageChannels)) {
-            return interaction.editReply({
+            return reply(interaction, {
                 content: '❌ I do not have permission to create ticket channels in the ticket category. I need **View Channel** and **Manage Channels**.'
-            });
+            }, true);
         }
 
         const tempChannel = await interaction.guild.channels.create({
@@ -243,22 +245,21 @@ async function handleCreateTicket(interaction) {
             components: [buildTicketButtons(ticketId)]
         });
 
-        return interaction.editReply({
+        return reply(interaction, {
             content: `✅ Your ticket has been created: ${tempChannel}`
-        });
+        }, true);
     } catch (error) {
         console.error('handleCreateTicket error:', error);
 
         if (interaction.deferred || interaction.replied) {
-            return interaction.editReply({
+            return reply(interaction, {
                 content: '❌ Failed to create ticket.'
-            }).catch(() => { });
+            }, true).catch(() => { });
         }
 
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Failed to create ticket.',
-            ephemeral: true
-        }).catch(() => { });
+        }, true).catch(() => { });
     }
 }
 
@@ -272,10 +273,9 @@ async function handleClaimTicket(interaction, ticketId) {
             (settings?.support_role_id && interaction.member.roles.cache.has(settings.support_role_id));
 
         if (!isStaff) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ Only staff can claim tickets.',
-                ephemeral: true
-            });
+            }, true);
         }
 
         await interaction.deferUpdate();
@@ -284,14 +284,12 @@ async function handleClaimTicket(interaction, ticketId) {
         if (!ticket || String(ticket.id) !== String(ticketId)) {
             return interaction.followUp({
                 content: '❌ This ticket record could not be found.',
-                ephemeral: true
             });
         }
 
         if (ticket.claimed_by) {
             return interaction.followUp({
                 content: '❌ This ticket has already been claimed.',
-                ephemeral: true
             });
         }
 
@@ -340,7 +338,6 @@ async function handleClaimTicket(interaction, ticketId) {
 
         return interaction.followUp({
             content: `✅ You claimed ticket #${ticket.id}.`,
-            ephemeral: true
         });
     } catch (error) {
         console.error('handleClaimTicket error:', error);
@@ -348,14 +345,12 @@ async function handleClaimTicket(interaction, ticketId) {
         if (interaction.deferred || interaction.replied) {
             return interaction.followUp({
                 content: '❌ Failed to claim ticket.',
-                ephemeral: true
             }).catch(() => { });
         }
 
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Failed to claim ticket.',
-            ephemeral: true
-        }).catch(() => { });
+        }, true).catch(() => { });
     }
 }
 
@@ -408,31 +403,27 @@ async function handleCloseTicket(interaction, ticketId) {
 
         const ticket = await getTicketByChannel(interaction.guild.id, interaction.channel.id);
         if (!ticket || String(ticket.id) !== String(ticketId)) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ This ticket record could not be found.',
-                ephemeral: true
-            });
+            }, true);
         }
 
         if (!isStaff && interaction.user.id !== ticket.creator_id) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ Only staff or the ticket creator can close this ticket.',
-                ephemeral: true
-            });
+            }, true);
         }
 
-        await interaction.reply({
+        await reply(interaction, {
             content: '⚠️ Are you sure you want to close this ticket?',
             components: [buildCloseConfirmButtons(ticket.id)],
-            ephemeral: true
-        });
+        }, true);
     } catch (error) {
         console.error('handleCloseTicket error:', error);
 
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Failed to start ticket close process.',
-            ephemeral: true
-        }).catch(() => { });
+        }, true).catch(() => { });
     }
 }
 
@@ -447,20 +438,16 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
 
         const ticket = await getTicketByChannel(interaction.guild.id, interaction.channel.id);
         if (!ticket || String(ticket.id) !== String(ticketId)) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ This ticket record could not be found.',
-                ephemeral: true
-            });
+            }, true);
         }
 
         if (!isStaff && interaction.user.id !== ticket.creator_id) {
-            return interaction.reply({
+            return reply(interaction, {
                 content: '❌ Only staff or the ticket creator can close this ticket.',
-                ephemeral: true
-            });
+            }, true);
         }
-
-        await interaction.deferReply();
 
         const transcriptText = await buildTranscript(interaction.channel);
         const transcriptBuffer = Buffer.from(transcriptText || 'No transcript data.', 'utf8');
@@ -538,15 +525,14 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
         console.error('handleCloseTicketConfirm error:', error);
 
         if (interaction.deferred || interaction.replied) {
-            return interaction.editReply({
+            return reply(interaction, {
                 content: '❌ Failed to close ticket.'
-            }).catch(() => { });
+            }, true).catch(() => { });
         }
 
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Failed to close ticket.',
-            ephemeral: true
-        }).catch(() => { });
+        }, true).catch(() => { });
     }
 }
 

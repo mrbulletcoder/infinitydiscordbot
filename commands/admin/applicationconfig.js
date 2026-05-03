@@ -14,10 +14,11 @@ module.exports = {
     usage: '/applicationconfig panel:<channel> review:<channel> cooldown:<hours>',
     userPermissions: PermissionFlagsBits.Administrator,
     botPermissions: [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks
-],
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('applicationconfig')
@@ -95,6 +96,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Applications' })
             .setTimestamp();
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

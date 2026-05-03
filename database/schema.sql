@@ -310,6 +310,9 @@ CREATE TABLE IF NOT EXISTS economy_users (
     last_daily BIGINT DEFAULT 0,
     last_work BIGINT DEFAULT 0,
     last_beg BIGINT DEFAULT 0,
+    last_crime BIGINT DEFAULT 0,
+    last_slots BIGINT DEFAULT 0,
+    last_rob BIGINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (guild_id, user_id)
 );
@@ -322,4 +325,12 @@ CREATE TABLE IF NOT EXISTS economy_transactions (
     amount BIGINT NOT NULL,
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS economy_inventory (
+    guild_id VARCHAR(32) NOT NULL,
+    user_id VARCHAR(32) NOT NULL,
+    item_id VARCHAR(100) NOT NULL,
+    quantity INT DEFAULT 1,
+    PRIMARY KEY (guild_id, user_id, item_id)
 );

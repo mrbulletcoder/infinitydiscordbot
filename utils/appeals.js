@@ -16,6 +16,11 @@ const {
     getCaseByNumber,
     getAppealableCasesForUser
 } = require('./moderationDb');
+const { safeReply } = require('../handlers/interactions/safeReply');
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 async function getTicketSettings(guildId) {
     const [rows] = await pool.query(
@@ -367,17 +372,17 @@ async function handleAppealGuildSelect(interaction) {
     const result = await getAppealableCasesForUser(guildId, interaction.user.id, 10);
 
     if (!result.ok) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Failed to load your cases.',
             ephemeral: true
-        });
+        }, true);
     }
 
     if (!result.rows.length) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ You do not have any appealable cases in that server.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const options = result.rows.slice(0, 25).map(row => ({
@@ -393,11 +398,11 @@ async function handleAppealGuildSelect(interaction) {
             .addOptions(options)
     );
 
-    return interaction.reply({
+    return reply(interaction,{
         content: 'Select the case you want to appeal.',
         components: [row],
         ephemeral: true
-    });
+    }, true);
 }
 
 async function handleAppealCaseSelect(interaction, guildId) {
@@ -460,30 +465,29 @@ async function updateAppealTicketMessage(interaction, appeal) {
 }
 
 async function handleAppealModal(interaction, guildId, caseNumber) {
-    await interaction.deferReply({ ephemeral: true });
 
     const appealReason = interaction.fields.getTextInputValue('appeal_reason')?.trim();
 
     const caseResult = await getCaseByNumber(guildId, Number(caseNumber));
     if (!caseResult.ok || !caseResult.rows.length) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ That case could not be found.'
-        });
+        }, true);
     }
 
     const caseData = caseResult.rows[0];
 
     if (String(caseData.user_id) !== String(interaction.user.id)) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ You can only appeal your own cases.'
-        });
+        }, true);
     }
 
     const existingAppeal = await getAppealByCase(guildId, Number(caseNumber), interaction.user.id);
     if (existingAppeal) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ You have already submitted an appeal for that case.'
-        });
+        }, true);
     }
 
     const guild =
@@ -491,9 +495,9 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
         await interaction.client.guilds.fetch(guildId).catch(() => null);
 
     if (!guild) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ I could not access that server anymore.'
-        });
+        }, true);
     }
 
     const appealId = await createAppealRecord({
@@ -515,41 +519,41 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
             caseData
         });
 
-        return interaction.editReply({
+        return reply(interaction,{
             content: `✅ Your appeal for **Case #${caseNumber}** has been submitted. Staff ticket: ${ticketChannel}`
-        });
+        }, true);
     } catch (error) {
         console.error('create appeal ticket error:', error);
 
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Your appeal was saved, but the ticket could not be created. Staff will need to check the setup.'
-        });
+        }, true);
     }
 }
 
 async function handleClaimAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Appeal not found.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only configured appeal staff can manage appeal tickets.',
             ephemeral: true
-        });
+        }, true);
     }
 
     if (appeal.claimed_by) {
-        return interaction.reply({
+        return reply(interaction,{
             content: `❌ This appeal has already been claimed by <@${appeal.claimed_by}>.`,
             ephemeral: true
-        });
+        }, true);
     }
 
     await pool.query(
@@ -562,28 +566,28 @@ async function handleClaimAppeal(interaction, appealId) {
     const updatedAppeal = await getAppealById(appealId);
     await updateAppealTicketMessage(interaction, updatedAppeal);
 
-    return interaction.reply({
+    return reply(interaction,{
         content: `✅ You claimed appeal #${appealId}.`,
         ephemeral: true
-    });
+    }, true);
 }
 
 async function handleApproveAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Appeal not found.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only configured appeal staff can resolve appeals.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -607,19 +611,19 @@ async function handleApproveAppeal(interaction, appealId) {
 async function handleDenyAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Appeal not found.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only configured appeal staff can resolve appeals.',
             ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -705,23 +709,23 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
 
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Appeal not found.'
-        });
+        }, true);
     }
 
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Only configured appeal staff can resolve appeals.'
-        });
+        }, true);
     }
 
     if (appeal.status === 'approved' || appeal.status === 'denied') {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ This appeal has already been decided.'
-        });
+        }, true);
     }
 
     const decisionReason = interaction.fields.getTextInputValue('decision_reason')?.trim();

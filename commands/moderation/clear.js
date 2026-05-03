@@ -9,6 +9,7 @@ const {
 } = require('discord.js');
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
+const logAction = require('../../utils/logAction');
 
 const CLEAR_COLOR = '#00bfff';
 
@@ -131,9 +132,7 @@ module.exports = {
             components: [row]
         }, true);
 
-        const collector = interaction.channel.createMessageComponentCollector({
-            time: 15000
-        });
+        const collector = interaction.channel.createMessageComponentCollector({ time: 15000 });
 
         collector.on('collect', async i => {
             if (!i.customId.endsWith(interaction.id)) return;
@@ -165,6 +164,7 @@ module.exports = {
                 });
 
                 return runClear({
+                    client: interaction.client,
                     guild: interaction.guild,
                     channel: interaction.channel,
                     moderator: interaction.user,
@@ -190,50 +190,28 @@ module.exports = {
     }
 };
 
-async function runClear({ guild, channel, moderator, filters, reply, publicSend }) {
+async function runClear({ client, guild, channel, moderator, filters, reply, publicSend }) {
     try {
         const messages = await channel.messages.fetch({ limit: 100 });
         let filtered = messages;
 
-        if (filters.user) {
-            filtered = filtered.filter(message => message.author.id === filters.user.id);
-        }
-
-        if (filters.bots) {
-            filtered = filtered.filter(message => message.author.bot);
-        }
-
-        if (filters.links) {
-            filtered = filtered.filter(message =>
-                /(https?:\/\/|discord\.gg\/|www\.)/gi.test(message.content)
-            );
-        }
-
-        if (filters.images) {
-            filtered = filtered.filter(message => message.attachments.size > 0);
-        }
-
-        if (filters.contains) {
-            filtered = filtered.filter(message =>
-                message.content.toLowerCase().includes(filters.contains.toLowerCase())
-            );
-        }
+        if (filters.user) filtered = filtered.filter(m => m.author.id === filters.user.id);
+        if (filters.bots) filtered = filtered.filter(m => m.author.bot);
+        if (filters.links) filtered = filtered.filter(m => /(https?:\/\/|discord\.gg\/|www\.)/gi.test(m.content));
+        if (filters.images) filtered = filtered.filter(m => m.attachments.size > 0);
+        if (filters.contains) filtered = filtered.filter(m => m.content.toLowerCase().includes(filters.contains.toLowerCase()));
 
         const amount = Math.min(filters.amount || filtered.size, 100);
         const toDelete = filtered.first(amount);
 
         if (!toDelete.length) {
-            return reply({
-                content: '❌ No messages matched your filters.'
-            });
+            return reply({ content: '❌ No messages matched your filters.' });
         }
 
         const deleted = await channel.bulkDelete(toDelete, true);
 
         if (!deleted.size) {
-            return reply({
-                content: '❌ No messages could be deleted. They may be older than 14 days.'
-            });
+            return reply({ content: '❌ No messages could be deleted. They may be older than 14 days.' });
         }
 
         const embed = buildClearEmbed({
@@ -244,20 +222,39 @@ async function runClear({ guild, channel, moderator, filters, reply, publicSend 
             guild
         });
 
-        await reply({ embeds: [embed] });
+        await logAction({
+            client,
+            guild,
+            action: '🧹 Messages Cleared',
+            user: filters.user || null,
+            moderator,
+            reason: `Cleared ${deleted.size} message(s)`,
+            color: CLEAR_COLOR,
+            extra: [
+                `**Channel:** ${channel}`,
+                `**Channel ID:** \`${channel.id}\``,
+                `**Deleted:** ${deleted.size}`,
+                `**Filters:**\n${buildFilterSummary(filters)}`
+            ].join('\n'),
+            createCase: false
+        }).catch(() => null);
 
+        // ✅ Ephemeral confirmation ONLY
+        await reply({
+            content: `✅ Cleared **${deleted.size}** message${deleted.size === 1 ? '' : 's'}.`
+        });
+
+        // ✅ Public embed ONLY
         const publicMessage = await publicSend({ embeds: [embed] }).catch(() => null);
 
         if (publicMessage) {
             setTimeout(() => {
                 publicMessage.delete().catch(() => null);
-            }, 8000);
+            }, 8000); // ⏱️ 8 seconds
         }
+
     } catch (error) {
         console.error('Clear Command Error:', error);
-
-        return reply({
-            content: '❌ Failed to clear messages.'
-        }).catch(() => null);
+        return reply({ content: '❌ Failed to clear messages.' }).catch(() => null);
     }
 }

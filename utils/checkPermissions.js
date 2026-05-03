@@ -1,4 +1,5 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const permissionNames = {
     [PermissionFlagsBits.Administrator]: 'Administrator',
@@ -14,6 +15,10 @@ const permissionNames = {
     [PermissionFlagsBits.EmbedLinks]: 'Embed Links',
     [PermissionFlagsBits.ReadMessageHistory]: 'Read Message History'
 };
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function formatPermission(permission) {
     if (Array.isArray(permission)) {

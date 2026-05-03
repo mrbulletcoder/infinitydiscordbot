@@ -2,6 +2,7 @@ const { pool } = require('../database');
 const logAction = require('./logAction');
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { logError } = require('./errorHandler');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const DISPLAY_TIME = 20000;
 const CACHE_TIME = 60 * 1000;
@@ -9,6 +10,10 @@ const CACHE_TIME = 60 * 1000;
 const userMessages = new Map();
 const configCache = new Map();
 const whitelistCache = new Map();
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function isCacheValid(cacheItem) {
     return cacheItem && Date.now() - cacheItem.createdAt < CACHE_TIME;

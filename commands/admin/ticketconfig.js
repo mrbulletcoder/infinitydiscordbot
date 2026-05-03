@@ -14,12 +14,13 @@ module.exports = {
     usage: '/ticketconfig category:<category> panel:<channel> transcripts:<channel> support:<role>',
     userPermissions: PermissionFlagsBits.Administrator,
     botPermissions: [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.ManageChannels,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks,
-    PermissionFlagsBits.ReadMessageHistory
-],
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.ReadMessageHistory
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('ticketconfig')
@@ -111,6 +112,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Tickets' })
             .setTimestamp();
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

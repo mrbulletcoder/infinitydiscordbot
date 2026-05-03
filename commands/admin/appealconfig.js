@@ -79,13 +79,13 @@ module.exports = {
                 .setFooter({ text: 'Infinity Appeals Setup' })
                 .setTimestamp();
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 embeds: [embed]
             }, true);
         } catch (error) {
             console.error('appealconfig error:', error);
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Failed to save appeal configuration.'
             }, true);
         }

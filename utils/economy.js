@@ -1,6 +1,11 @@
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const COIN = '🪙';
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function formatMoney(amount) {
     return `${COIN} ${Number(amount || 0).toLocaleString()}`;

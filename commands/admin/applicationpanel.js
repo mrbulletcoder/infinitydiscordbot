@@ -15,10 +15,11 @@ module.exports = {
     usage: '/applicationpanel',
     userPermissions: PermissionFlagsBits.Administrator,
     botPermissions: [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks
-],
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('applicationpanel')
@@ -37,7 +38,7 @@ module.exports = {
 
         const settings = settingsRows[0];
         if (!settings?.panel_channel_id) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Applications are not configured yet. Use `/applicationconfig` first.'
             }, true);
         }
@@ -51,7 +52,7 @@ module.exports = {
         );
 
         if (!positions.length) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ No enabled application positions found. Use `/applicationposition add` first.'
             }, true);
         }
@@ -61,7 +62,7 @@ module.exports = {
             await interaction.guild.channels.fetch(settings.panel_channel_id).catch(() => null);
 
         if (!panelChannel) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ The configured panel channel could not be found.'
             }, true);
         }
@@ -100,7 +101,7 @@ module.exports = {
             components: [row]
         });
 
-        return safeReply(interaction,{
+        return safeReply(interaction, {
             content: `✅ Application panel sent to ${panelChannel}.`
         }, true);
     }

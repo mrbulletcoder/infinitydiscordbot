@@ -10,6 +10,11 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function hasReportStaffPerms(member) {
     return (
@@ -201,34 +206,31 @@ async function updateReportMessage(interaction, report, overrides = {}, disableB
 
 async function handleClaimReport(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Only staff can manage reports.',
-            ephemeral: true
-        });
+        }, true);
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Report not found.'
-        });
+        }, true);
     }
 
     const currentStatus = String(report.status || '').toLowerCase();
 
     if (!['open', 'claimed'].includes(currentStatus)) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: `❌ This report is already ${report.status}.`
-        });
+        }, true);
     }
 
     if (report.claimed_by && report.claimed_by !== interaction.user.id) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ This report has already been claimed by another staff member.'
-        });
+        }, true);
     }
 
     await pool.query(
@@ -255,33 +257,30 @@ async function handleClaimReport(interaction, reportId) {
         false
     );
 
-    return interaction.editReply({
+    return reply(interaction,{
         content: `✅ You claimed report case #${report.case_number}.`
-    });
+    }, true);
 }
 
 async function handleResolveReport(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only staff can manage reports.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Report not found.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return interaction.reply({
+        return reply(interaction,{
             content: `❌ This report is already ${report.status}.`,
-            ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -304,26 +303,23 @@ async function handleResolveReport(interaction, reportId) {
 
 async function handleDismissReport(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only staff can manage reports.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Report not found.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return interaction.reply({
+        return reply(interaction,{
             content: `❌ This report is already ${report.status}.`,
-            ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -346,26 +342,23 @@ async function handleDismissReport(interaction, reportId) {
 
 async function handleResolveReportModal(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only staff can manage reports.',
-            ephemeral: true
-        });
+        }, true);
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Report not found.'
-        });
+        }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: `❌ This report is already ${report.status}.`
-        });
+        }, true);
     }
 
     const reason = interaction.fields.getTextInputValue('reason');
@@ -457,33 +450,30 @@ async function handleResolveReportModal(interaction, reportId) {
         await target.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    return interaction.editReply({
+    return reply(interaction,{
         content: `✅ Report case #${report.case_number} resolved.`
-    });
+    }, true);
 }
 
 async function handleDismissReportModal(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Only staff can manage reports.',
-            ephemeral: true
-        });
+        }, true);
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ Report not found.'
         });
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: `❌ This report is already ${report.status}.`
-        });
+        }, true);
     }
 
     const reason = interaction.fields.getTextInputValue('reason');
@@ -551,9 +541,9 @@ async function handleDismissReportModal(interaction, reportId) {
         await reporter.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    return interaction.editReply({
+    return reply(interaction,{
         content: `✅ Report case #${report.case_number} dismissed.`
-    });
+    }, true);
 }
 
 module.exports = {

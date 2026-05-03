@@ -7,6 +7,8 @@ const {
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
+const logAction = require('../../utils/logAction');
+
 const UNLOCK_COLOR = '#57f287';
 
 function formatUser(user) {
@@ -56,6 +58,21 @@ module.exports = {
             await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, {
                 SendMessages: null
             });
+
+            await logAction({
+                client: interaction.client,
+                guild: interaction.guild,
+                action: '🔓 Channel Unlocked',
+                user: null,
+                moderator: interaction.user,
+                reason,
+                color: UNLOCK_COLOR,
+                extra: [
+                    `**Channel:** ${channel}`,
+                    `**Channel ID:** \`${channel.id}\``
+                ].join('\n'),
+                createCase: false
+            }).catch(() => null);
 
             return safeReply(interaction, {
                 embeds: [buildUnlockEmbed({

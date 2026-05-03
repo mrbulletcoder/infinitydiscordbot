@@ -8,6 +8,11 @@ const {
     TextInputStyle
 } = require('discord.js');
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function formatCooldown(ms) {
     const totalSeconds = Math.ceil(ms / 1000);
@@ -111,19 +116,17 @@ async function handleCreateApplication(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ The applications system is not configured yet.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const position = await getApplicationPosition(interaction.guild.id, positionId);
 
     if (!position) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ That application position could not be found or is disabled.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const [pendingRows] = await pool.query(
@@ -135,22 +138,20 @@ async function handleCreateApplication(interaction, positionId) {
     );
 
     if (pendingRows.length) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ You already have a pending application.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const cooldown = await checkApplicationCooldown(interaction.guild.id, interaction.user.id);
 
     if (cooldown) {
-        return interaction.reply({
+        return reply(interaction, {
             content:
                 `❌ You are on application cooldown.\n` +
                 `You can apply again in **${cooldown.remainingText}**.\n` +
                 `Cooldown ends: <t:${Math.floor(cooldown.expiresAt / 1000)}:R>`,
-            ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -207,22 +208,18 @@ async function handleApplicationModal(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ The applications system is not configured yet.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const position = await getApplicationPosition(interaction.guild.id, positionId);
 
     if (!position) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ That application position could not be found or is disabled.',
-            ephemeral: true
-        });
+        }, true);
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const [pendingRows] = await pool.query(
         `SELECT id
@@ -233,20 +230,20 @@ async function handleApplicationModal(interaction, positionId) {
     );
 
     if (pendingRows.length) {
-        return interaction.editReply({
+        return reply(interaction,{
             content: '❌ You already have a pending application.'
-        });
+        }, true);
     }
 
     const cooldown = await checkApplicationCooldown(interaction.guild.id, interaction.user.id);
 
     if (cooldown) {
-        return interaction.editReply({
+        return reply(interaction,{
             content:
                 `❌ You are on application cooldown.\n` +
                 `You can apply again in **${cooldown.remainingText}**.\n` +
                 `Cooldown ends: <t:${Math.floor(cooldown.expiresAt / 1000)}:R>`
-        });
+        }, true);
     }
 
     const answers = {
@@ -278,9 +275,9 @@ async function handleApplicationModal(interaction, positionId) {
         await interaction.guild.channels.fetch(settings.review_channel_id).catch(() => null);
 
     if (!reviewChannel) {
-        return interaction.editReply({
+        return reply(interaction, {
             content: '❌ The configured review channel could not be found.'
-        });
+        }, true);
     }
 
     const embed = new EmbedBuilder()
@@ -345,9 +342,9 @@ async function handleApplicationModal(interaction, positionId) {
         components: [buildApplicationButtons(applicationId)]
     });
 
-    return interaction.editReply({
+    return reply(interaction,{
         content: `✅ Your application for **${position.name}** has been submitted successfully.`
-    });
+    }, true);
 }
 
 async function handleAcceptApplication(interaction, applicationId) {
@@ -355,13 +352,10 @@ async function handleAcceptApplication(interaction, applicationId) {
         !interaction.member.permissions.has('Administrator') &&
         !interaction.member.permissions.has('ManageGuild')
     ) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Only staff can review applications.',
-            ephemeral: true
-        });
+        }, true);
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const [rows] = await pool.query(
         `SELECT *
@@ -373,15 +367,15 @@ async function handleAcceptApplication(interaction, applicationId) {
 
     const application = rows[0];
     if (!application) {
-        return interaction.editReply({
+        return reply(interaction, {
             content: '❌ Application not found.'
-        });
+        }, true);
     }
 
     if (application.status !== 'pending') {
-        return interaction.editReply({
+        return reply(interaction, {
             content: `❌ This application has already been ${application.status}.`
-        });
+        }, true);
     }
 
     await pool.query(
@@ -446,9 +440,9 @@ async function handleAcceptApplication(interaction, applicationId) {
         components: []
     });
 
-    return interaction.editReply({
+    return reply(interaction, {
         content: `✅ Application #${application.id} accepted.`
-    });
+    }, true);
 }
 
 async function handleDenyApplication(interaction, applicationId) {
@@ -456,10 +450,9 @@ async function handleDenyApplication(interaction, applicationId) {
         !interaction.member.permissions.has('Administrator') &&
         !interaction.member.permissions.has('ManageGuild')
     ) {
-        return interaction.reply({
+        return reply(interaction, {
             content: '❌ Only staff can review applications.',
-            ephemeral: true
-        });
+        }, true);
     }
 
     const modal = new ModalBuilder()
@@ -481,7 +474,6 @@ async function handleDenyApplication(interaction, applicationId) {
 }
 
 async function handleDenyApplicationModal(interaction, applicationId) {
-    await interaction.deferReply({ ephemeral: true });
 
     const [rows] = await pool.query(
         `SELECT *
@@ -493,15 +485,15 @@ async function handleDenyApplicationModal(interaction, applicationId) {
 
     const application = rows[0];
     if (!application) {
-        return interaction.editReply({
+        return reply(interaction, {
             content: '❌ Application not found.'
-        });
+        }, true);
     }
 
     if (application.status !== 'pending') {
-        return interaction.editReply({
+        return reply(interaction, {
             content: `❌ This application has already been ${application.status}.`
-        });
+        }, true);
     }
 
     const reason = interaction.fields.getTextInputValue('reason');
@@ -572,9 +564,9 @@ async function handleDenyApplicationModal(interaction, applicationId) {
         components: []
     });
 
-    return interaction.editReply({
+    return reply(interaction, {
         content: `✅ Application #${application.id} denied.`
-    });
+    }, true);
 }
 
 module.exports = {

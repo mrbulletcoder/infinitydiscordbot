@@ -2,13 +2,17 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle,
-    MessageFlags
+    ButtonStyle
 } = require('discord.js');
 
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const activeGiveawayIntervals = new Map();
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function parseDuration(input) {
     const value = String(input).toLowerCase().trim();
@@ -377,42 +381,37 @@ function checkGiveawayRequirements(member, giveaway) {
 async function handleGiveawayEnter(interaction) {
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Giveaway data could not be found.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     if (giveaway.ended || Date.now() >= giveaway.end_at) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ This giveaway has already ended.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     if (!member) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Could not verify your server membership.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const requirementCheck = checkGiveawayRequirements(member, giveaway);
     if (!requirementCheck.ok) {
-        return interaction.reply({
+        return reply(interaction,{
             content: requirementCheck.message,
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const entries = safeParseEntries(giveaway.entries_json);
 
     if (entries.includes(interaction.user.id)) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ You are already entered in this giveaway.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     entries.push(interaction.user.id);
@@ -421,52 +420,46 @@ async function handleGiveawayEnter(interaction) {
     const updatedGiveaway = await fetchGiveawayById(giveaway.id);
     await editGiveawayMessage(interaction.client, updatedGiveaway).catch(() => null);
 
-    return interaction.reply({
+    return reply(interaction,{
         content: `✅ You have entered **${updatedGiveaway.prize}**. Good luck!`,
-        flags: MessageFlags.Ephemeral
-    });
+    }, true);
 }
 
 async function handleGiveawayEntries(interaction) {
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Giveaway data could not be found.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const entries = safeParseEntries(giveaway.entries_json);
 
-    return interaction.reply({
+    return reply(interaction,{
         content: entries.length
             ? `👥 **${giveaway.prize}** currently has **${entries.length}** entr${entries.length === 1 ? 'y' : 'ies'}.`
             : `👥 **${giveaway.prize}** currently has **0 entries**.`,
-        flags: MessageFlags.Ephemeral
-    });
+    }, true);
 }
 
 async function handleGiveawayEnd(interaction) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ You need **Manage Server** to end giveaways.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Giveaway data could not be found.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     if (giveaway.ended) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ This giveaway has already ended.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const row = new ActionRowBuilder().addComponents(
@@ -482,19 +475,17 @@ async function handleGiveawayEnd(interaction) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return interaction.reply({
+    return reply(interaction,{
         content: `⚠️ Are you sure you want to end **${giveaway.prize}** right now?`,
         components: [row],
-        flags: MessageFlags.Ephemeral
-    });
+    }, true);
 }
 
 async function handleGiveawayConfirmEnd(interaction, giveawayId) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ You need **Manage Server** to end giveaways.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const result = await endGiveaway(interaction.client, giveawayId, false);
@@ -521,33 +512,29 @@ async function handleGiveawayCancelEnd(interaction) {
 
 async function handleGiveawayReroll(interaction) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ You need **Manage Server** to reroll giveaways.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ Giveaway data could not be found.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     if (!giveaway.ended) {
-        return interaction.reply({
+        return reply(interaction,{
             content: '❌ End the giveaway before rerolling it.',
-            flags: MessageFlags.Ephemeral
-        });
+        }, true);
     }
 
     await endGiveaway(interaction.client, giveaway.id, true);
 
-    return interaction.reply({
+    return reply(interaction,{
         content: `✅ Giveaway rerolled for **${giveaway.prize}**.`,
-        flags: MessageFlags.Ephemeral
-    });
+    }, true);
 }
 
 module.exports = {

@@ -23,10 +23,11 @@ module.exports = {
     usage: '/setwelcomeconfig channel:<#channel> message:<text>',
     userPermissions: PermissionFlagsBits.Administrator,
     botPermissions: [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks
-],
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('setwelcomeconfig')
@@ -78,11 +79,11 @@ module.exports = {
             const role = interaction.options.getRole('role');
 
             if (!channel && !messageText && !title && !color && !rules && !chat && !role) {
-                return safeReply(interaction,'⚠️ You must provide at least one setting to update.'), true;
+                return safeReply(interaction, '⚠️ You must provide at least one setting to update.'), true;
             }
 
             if (color && !isHexColor(color)) {
-                return safeReply(interaction,'❌ Please provide a valid 6-digit hex color like `#00bfff`.');
+                return safeReply(interaction, '❌ Please provide a valid 6-digit hex color like `#00bfff`.');
             }
 
             const [rows] = await pool.query(
@@ -199,15 +200,15 @@ module.exports = {
                 })
                 .setTimestamp();
 
-            return safeReply(interaction,{ embeds: [preview] }, true);
+            return safeReply(interaction, { embeds: [preview] }, true);
         } catch (err) {
             console.error('setwelcomeconfig error:', err);
 
             if (interaction.deferred) {
-                return safeReply(interaction,'❌ Something went wrong while updating welcome settings.'), true;
+                return safeReply(interaction, '❌ Something went wrong while updating welcome settings.'), true;
             }
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Something went wrong while updating welcome settings.',
                 ephemeral: true
             }, true).catch(() => { });

@@ -16,14 +16,6 @@ function formatCooldown(ms) {
     return `${seconds}s`;
 }
 
-async function respond(interaction, options) {
-    if (interaction.deferred || interaction.replied) {
-        return interaction.editReply(options);
-    }
-
-    return interaction.reply(options);
-}
-
 async function handleCommandCooldown(interaction, command) {
     if (!interaction.client.cooldowns) interaction.client.cooldowns = new Map();
 
@@ -57,21 +49,18 @@ async function handleSlashCommand(interaction, client) {
     const command = client.commands.get(interaction.commandName);
 
     if (!command) {
-        return interaction.reply({
+        return safeReply(interaction, {
             content: '❌ That command could not be found.',
-            flags: 64
-        });
+        }, true);
     }
 
     if (typeof command.executeSlash !== 'function') {
-        return interaction.reply({
+        return safeReply(interaction, {
             content: '❌ That command is not set up correctly.',
-            flags: 64
-        });
+        }, true);
     }
 
     try {
-        await interaction.deferReply();
 
         let allowed = false;
 
@@ -84,15 +73,15 @@ async function handleSlashCommand(interaction, client) {
                 guild: interaction.guild ? `${interaction.guild.name} (${interaction.guild.id})` : 'DM'
             });
 
-            return respond(interaction, {
+            return safeReply(interaction, {
                 content: '❌ Failed to check permissions for that command.'
-            });
+            }, true);
         }
 
         if (!allowed) {
-            return respond(interaction, {
+            return safeReply(interaction, {
                 content: '❌ You do not have permission to use this command.'
-            });
+            }, true);
         }
 
         const isCoolingDown = await handleCommandCooldown(interaction, command);
@@ -107,9 +96,9 @@ async function handleSlashCommand(interaction, client) {
             channel: interaction.channel ? `${interaction.channel.name} (${interaction.channel.id})` : 'Unknown'
         });
 
-        return respond(interaction, {
+        return safeReply(interaction, {
             content: `❌ Something went wrong while running this command.\nError ID: \`${errorId}\``
-        }).catch(() => null);
+        }, true).catch(() => null);
     }
 }
 

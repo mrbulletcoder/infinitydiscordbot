@@ -25,6 +25,10 @@ module.exports = {
     description: 'Manage the rank system.',
     usage: '/ranks config | mode | whitelistadd | whitelistremove | blacklistadd | blacklistremove | xpsettings',
     userPermissions: PermissionFlagsBits.ManageGuild,
+    botPermissions: [
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('ranks')
@@ -177,14 +181,14 @@ module.exports = {
                     .setFooter({ text: 'All channels are whitelisted by default unless blacklisted' })
                     .setTimestamp();
 
-                return safeReply(interaction,{ embeds: [embed] }, true);
+                return safeReply(interaction, { embeds: [embed] }, true);
             }
 
             if (sub === 'mode') {
                 const mode = interaction.options.getString('mode', true);
                 await setRankMode(guildId, mode);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ Rank mode set to **${mode === 'all_whitelisted' ? 'All Whitelisted' : 'Whitelist Only'}**.`
                 }, true);
             }
@@ -193,7 +197,7 @@ module.exports = {
                 const channel = interaction.options.getChannel('channel', true);
                 await addWhitelistChannel(guildId, channel.id);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ Added ${channel} to the XP whitelist.`
                 }, true);
             }
@@ -202,7 +206,7 @@ module.exports = {
                 const channel = interaction.options.getChannel('channel', true);
                 await removeWhitelistChannel(guildId, channel.id);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ Removed ${channel} from the XP whitelist.`
                 }, true);
             }
@@ -211,7 +215,7 @@ module.exports = {
                 const channel = interaction.options.getChannel('channel', true);
                 await addBlacklistChannel(guildId, channel.id);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ Added ${channel} to the XP blacklist.`
                 }, true);
             }
@@ -220,7 +224,7 @@ module.exports = {
                 const channel = interaction.options.getChannel('channel', true);
                 await removeBlacklistChannel(guildId, channel.id);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ Removed ${channel} from the XP blacklist.`
                 }, true);
             }
@@ -231,25 +235,25 @@ module.exports = {
                 const cooldown = interaction.options.getInteger('cooldown', true);
 
                 if (xpMin > xpMax) {
-                    return safeReply(interaction,{
+                    return safeReply(interaction, {
                         content: '❌ `xp_min` cannot be greater than `xp_max`.'
                     }, true);
                 }
 
                 await setRankXpConfig(guildId, xpMin, xpMax, cooldown);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: `✅ XP settings updated to **${xpMin}-${xpMax} XP** with a **${cooldown}s** cooldown.`
                 }, true);
             }
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Unknown subcommand.'
             }, true);
         } catch (error) {
             console.error('Ranks command error:', error);
 
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 content: '❌ Something went wrong while running that command.'
             }, true);
         }

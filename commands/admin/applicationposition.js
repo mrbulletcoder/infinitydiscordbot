@@ -13,8 +13,9 @@ module.exports = {
     usage: '/applicationposition <add|remove|list|toggle>',
     userPermissions: PermissionFlagsBits.Administrator,
     botPermissions: [
-    PermissionFlagsBits.EmbedLinks
-],
+        PermissionFlagsBits.EmbedLinks
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('applicationposition')

@@ -218,12 +218,13 @@ module.exports = {
     usage: '/reactionrole createcategory | editcategory | addrole | removerole | send | update | preview | info | list | clear | deletecategory',
     userPermissions: PermissionFlagsBits.ManageGuild,
     botPermissions: [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.EmbedLinks,
-    PermissionFlagsBits.ReadMessageHistory,
-    PermissionFlagsBits.AddReactions
-],
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.AddReactions
+    ],
+    cooldown: 3,
 
     slashData: new SlashCommandBuilder()
         .setName('reactionrole')
@@ -443,7 +444,7 @@ module.exports = {
 
                 const existing = await getCategoryByName(guildId, name);
                 if (existing) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('A reaction role category with that name already exists.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('A reaction role category with that name already exists.')] }, true);
                 }
 
                 await pool.query(
@@ -451,7 +452,7 @@ module.exports = {
                     [guildId, name, description, mode]
                 );
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed(`Created reaction role category **${name}**.\n**Mode:** ${mode === 'single' ? 'Single Select' : 'Multi Select'}`)]
                 }, true);
             }
@@ -464,17 +465,17 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 if (!newName && !newDescription && !newMode) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('Give me at least one thing to update: name, description, or mode.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('Give me at least one thing to update: name, description, or mode.')] }, true);
                 }
 
                 if (newName && newName.toLowerCase() !== category.name.toLowerCase()) {
                     const existing = await getCategoryByName(guildId, newName);
                     if (existing) {
-                        return safeReply(interaction,{ embeds: [errorEmbed('Another category already uses that name.')] }, true);
+                        return safeReply(interaction, { embeds: [errorEmbed('Another category already uses that name.')] }, true);
                     }
                 }
 
@@ -492,12 +493,12 @@ module.exports = {
 
                 const panelResult = await refreshPanelsIfAny(interaction, updatedCategory);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed([
                         `Updated category **${updatedCategory.name}**.`,
                         panelResult ? `Refreshed **${panelResult.updatedCount}** panel(s).` : null
                     ].filter(Boolean).join('\n'))]
-                }. true);
+                }.true);
             }
 
             if (sub === 'addrole') {
@@ -508,24 +509,24 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const items = await getItems(guildId, category.id);
                 if (items.length >= MAX_ROLES_PER_CATEGORY) {
-                    return safeReply(interaction,{ embeds: [errorEmbed(`That category already has the max of **${MAX_ROLES_PER_CATEGORY}** role options.`)] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed(`That category already has the max of **${MAX_ROLES_PER_CATEGORY}** role options.`)] }, true);
                 }
 
                 const roleError = await validateRole(interaction, role);
                 if (roleError) {
-                    return safeReply(interaction,{ embeds: [errorEmbed(roleError)] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed(roleError)] }, true);
                 }
 
                 let parsedEmoji;
                 try {
                     parsedEmoji = await parseEmojiInput(emojiInput, interaction.guild);
                 } catch (error) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That emoji could not be used. Try a normal emoji like 🎮 or a full custom emoji like `<:Xbox:123456789>`.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That emoji could not be used. Try a normal emoji like 🎮 or a full custom emoji like `<:Xbox:123456789>`.')] }, true);
                 }
 
                 const { emojiKey, emojiDisplay } = parsedEmoji;
@@ -536,7 +537,7 @@ module.exports = {
                 );
 
                 if (existingEmoji.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That emoji is already being used in this category.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That emoji is already being used in this category.')] }, true);
                 }
 
                 const [existingRole] = await pool.query(
@@ -545,7 +546,7 @@ module.exports = {
                 );
 
                 if (existingRole.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That role is already in this category.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That role is already in this category.')] }, true);
                 }
 
                 await pool.query(
@@ -559,7 +560,7 @@ module.exports = {
 
                 const panelResult = await refreshPanelsIfAny(interaction, category);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed([
                         `Added ${emojiDisplay} → ${role} to **${category.name}**.`,
                         `**Label:** ${label}`,
@@ -574,7 +575,7 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const [result] = await pool.query(
@@ -583,12 +584,12 @@ module.exports = {
                 );
 
                 if (!result.affectedRows) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That role is not in this category.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That role is not in this category.')] }, true);
                 }
 
                 const panelResult = await refreshPanelsIfAny(interaction, category);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed([
                         `Removed ${role} from **${category.name}**.`,
                         panelResult ? `Refreshed **${panelResult.updatedCount}** existing panel(s).` : null
@@ -602,17 +603,17 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const items = await getItems(guildId, category.id);
                 if (!items.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
                 }
 
                 const permissions = channel.permissionsFor(interaction.guild.members.me);
                 if (!permissions?.has(PermissionFlagsBits.ViewChannel) || !permissions?.has(PermissionFlagsBits.SendMessages) || !permissions?.has(PermissionFlagsBits.AddReactions) || !permissions?.has(PermissionFlagsBits.ReadMessageHistory)) {
-                    return safeReply(interaction,{
+                    return safeReply(interaction, {
                         embeds: [errorEmbed(`I need **View Channel**, **Send Messages**, **Add Reactions**, and **Read Message History** in ${channel}.`)]
                     }, true);
                 }
@@ -628,7 +629,7 @@ module.exports = {
                     [guildId, category.id, channel.id, panelMessage.id]
                 );
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed(`Reaction role panel sent in ${channel}.\n[Jump to panel](${panelMessage.url})`)]
                 }, true);
             }
@@ -638,22 +639,22 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const items = await getItems(guildId, category.id);
                 if (!items.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
                 }
 
                 const panels = await getPanels(guildId, category.id);
                 if (!panels.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('No sent panels exist for that category yet.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('No sent panels exist for that category yet.')] }, true);
                 }
 
                 const result = await updateCategoryPanels(interaction, category, items);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed([
                         `Updated **${result.updatedCount}** panel(s) for **${category.name}**.`,
                         result.removedCount ? `Removed **${result.removedCount}** stale panel record(s).` : null,
@@ -667,15 +668,15 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const items = await getItems(guildId, category.id);
                 if (!items.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category has no roles yet. Add roles first.')] }, true);
                 }
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     content: 'Here is a private preview of the reaction role panel:',
                     embeds: [buildReactionRoleEmbed(category, items, interaction.guild.name)]
                 }, true);
@@ -686,13 +687,13 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const items = await getItems(guildId, category.id);
                 const panels = await getPanels(guildId, category.id);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [buildCategorySummaryEmbed(interaction.guild, category, items, panels)]
                 }, true);
             }
@@ -704,7 +705,7 @@ module.exports = {
                 );
 
                 if (!categories.length) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('No reaction role categories exist yet. Use `/reactionrole createcategory` to make one.')] }, true);
+                    return safeReply(interaction, { embeds: [errorEmbed('No reaction role categories exist yet. Use `/reactionrole createcategory` to make one.')] }, true);
                 }
 
                 const categoriesWithItems = [];
@@ -715,7 +716,7 @@ module.exports = {
                     categoriesWithItems.push({ category, items, panelCount: panels.length });
                 }
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [buildAllCategoriesEmbed(categoriesWithItems)]
                 }, true);
             }
@@ -725,7 +726,7 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] });
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] });
                 }
 
                 const [result] = await pool.query(
@@ -747,7 +748,7 @@ module.exports = {
                     }
                 }
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed(`Cleared **${result.affectedRows}** role option(s) from **${category.name}**.`)]
                 }, true);
             }
@@ -757,19 +758,19 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction,{ embeds: [errorEmbed('That category does not exist.')] });
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] });
                 }
 
                 await pool.query(`DELETE FROM reaction_role_messages WHERE guild_id = ? AND category_id = ?`, [guildId, category.id]);
                 await pool.query(`DELETE FROM reaction_role_items WHERE guild_id = ? AND category_id = ?`, [guildId, category.id]);
                 await pool.query(`DELETE FROM reaction_role_categories WHERE guild_id = ? AND id = ?`, [guildId, category.id]);
 
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [successEmbed(`Deleted category **${category.name}** and all of its reaction roles.`)]
                 }, true);
             }
 
-            return safeReply(interaction,{ embeds: [errorEmbed('Unknown subcommand.')] }, true);
+            return safeReply(interaction, { embeds: [errorEmbed('Unknown subcommand.')] }, true);
         } catch (error) {
             console.error('Reaction role command error:', error);
 

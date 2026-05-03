@@ -7,6 +7,8 @@ const {
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
+const logAction = require('../../utils/logAction');
+
 const SLOWMODE_COLOR = '#ffaa00';
 const MAX_SLOWMODE_SECONDS = 21600;
 
@@ -75,6 +77,23 @@ module.exports = {
             const oldSeconds = channel.rateLimitPerUser || 0;
 
             await channel.setRateLimitPerUser(seconds, `Updated by ${interaction.user.tag}: ${reason}`);
+
+            await logAction({
+                client: interaction.client,
+                guild: interaction.guild,
+                action: seconds === 0 ? '🐢 Slowmode Disabled' : '🐢 Slowmode Updated',
+                user: null,
+                moderator: interaction.user,
+                reason,
+                color: SLOWMODE_COLOR,
+                extra: [
+                    `**Channel:** ${channel}`,
+                    `**Channel ID:** \`${channel.id}\``,
+                    `**Old Delay:** ${formatDuration(oldSeconds)}`,
+                    `**New Delay:** ${formatDuration(seconds)}`
+                ].join('\n'),
+                createCase: false
+            }).catch(() => null);
 
             return safeReply(interaction, {
                 embeds: [buildSlowmodeEmbed({

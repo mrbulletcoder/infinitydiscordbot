@@ -1,5 +1,6 @@
 const { EmbedBuilder, PermissionFlagsBits, ChannelType, AuditLogEvent } = require('discord.js');
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#00bfff';
 const SUCCESS_COLOR = '#57f287';
@@ -28,6 +29,10 @@ const COLUMNS = {
 let tableReady = false;
 const cache = new Map();
 const CACHE_MS = 30_000;
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 function cut(value, max = 1024) {
     const text = String(value ?? '').trim();

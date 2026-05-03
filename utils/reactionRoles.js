@@ -1,7 +1,12 @@
 const { pool } = require('../database');
+const { safeReply } = require('../handlers/interactions/safeReply');
 
 const reactionRoleCooldowns = new Map();
 const reactionRoleCooldownNotices = new Map();
+
+function reply(interaction, payload, ephemeral = true) {
+    return safeReply(interaction, payload, ephemeral);
+}
 
 async function parseEmojiInput(input, guild = null) {
     const trimmed = String(input || '').trim();
