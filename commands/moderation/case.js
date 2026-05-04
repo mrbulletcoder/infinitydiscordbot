@@ -38,22 +38,6 @@ function errorEmbed(description) {
         .setTimestamp();
 }
 
-async function safeDefer(interaction) {
-    if (interaction.deferred || interaction.replied) return true;
-
-    try {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        return true;
-    } catch (error) {
-        if (error.code === 10062) {
-            console.error('Case command interaction expired before deferReply.');
-            return false;
-        }
-
-        throw error;
-    }
-}
-
 async function buildCaseEmbed(client, guild, foundCase) {
     const targetUser = foundCase.user_id
         ? await client.users.fetch(foundCase.user_id).catch(() => null)

@@ -29,22 +29,6 @@ function errorEmbed(description) {
         .setTimestamp();
 }
 
-async function safeDefer(interaction) {
-    if (interaction.deferred || interaction.replied) return true;
-
-    try {
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        return true;
-    } catch (error) {
-        if (error.code === 10062) {
-            console.error('Caseedit command interaction expired before deferReply.');
-            return false;
-        }
-
-        throw error;
-    }
-}
-
 module.exports = {
     name: 'caseedit',
     description: 'Edit the reason for a moderation case.',

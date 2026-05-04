@@ -374,14 +374,12 @@ async function handleAppealGuildSelect(interaction) {
     if (!result.ok) {
         return reply(interaction, {
             content: '❌ Failed to load your cases.',
-            ephemeral: true
         }, true);
     }
 
     if (!result.rows.length) {
         return reply(interaction, {
             content: '❌ You do not have any appealable cases in that server.',
-            ephemeral: true
         }, true);
     }
 
@@ -401,7 +399,6 @@ async function handleAppealGuildSelect(interaction) {
     return reply(interaction,{
         content: 'Select the case you want to appeal.',
         components: [row],
-        ephemeral: true
     }, true);
 }
 
@@ -536,7 +533,6 @@ async function handleClaimAppeal(interaction, appealId) {
     if (!appeal) {
         return reply(interaction,{
             content: '❌ Appeal not found.',
-            ephemeral: true
         }, true);
     }
 
@@ -545,14 +541,12 @@ async function handleClaimAppeal(interaction, appealId) {
     if (!isAppealStaff(interaction.member, settings)) {
         return reply(interaction,{
             content: '❌ Only configured appeal staff can manage appeal tickets.',
-            ephemeral: true
         }, true);
     }
 
     if (appeal.claimed_by) {
         return reply(interaction,{
             content: `❌ This appeal has already been claimed by <@${appeal.claimed_by}>.`,
-            ephemeral: true
         }, true);
     }
 
@@ -568,7 +562,6 @@ async function handleClaimAppeal(interaction, appealId) {
 
     return reply(interaction,{
         content: `✅ You claimed appeal #${appealId}.`,
-        ephemeral: true
     }, true);
 }
 
@@ -577,7 +570,6 @@ async function handleApproveAppeal(interaction, appealId) {
     if (!appeal) {
         return reply(interaction,{
             content: '❌ Appeal not found.',
-            ephemeral: true
         }, true);
     }
 
@@ -586,7 +578,6 @@ async function handleApproveAppeal(interaction, appealId) {
     if (!isAppealStaff(interaction.member, settings)) {
         return reply(interaction,{
             content: '❌ Only configured appeal staff can resolve appeals.',
-            ephemeral: true
         }, true);
     }
 
@@ -613,7 +604,6 @@ async function handleDenyAppeal(interaction, appealId) {
     if (!appeal) {
         return reply(interaction,{
             content: '❌ Appeal not found.',
-            ephemeral: true
         }, true);
     }
 
@@ -622,7 +612,6 @@ async function handleDenyAppeal(interaction, appealId) {
     if (!isAppealStaff(interaction.member, settings)) {
         return reply(interaction,{
             content: '❌ Only configured appeal staff can resolve appeals.',
-            ephemeral: true
         }, true);
     }
 
@@ -705,7 +694,6 @@ async function applyApprovedAppeal(interaction, appeal) {
 }
 
 async function handleAppealDecisionModal(interaction, appealId, decision) {
-    await interaction.deferReply({ ephemeral: false });
 
     const appeal = await getAppealById(appealId);
     if (!appeal) {
