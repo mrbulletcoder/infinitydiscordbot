@@ -21,7 +21,8 @@ async function handleCommandCooldown(interaction, command) {
 
     const cooldowns = interaction.client.cooldowns;
     const commandName = command.name || interaction.commandName;
-    const key = `${interaction.user.id}:${commandName}`;
+    const guildId = interaction.guild?.id || 'dm';
+    const key = `${guildId}:${interaction.user.id}:${commandName}:slash`;
     const cooldownSeconds = getCommandCooldown(command);
 
     if (cooldownSeconds <= 0) return false;

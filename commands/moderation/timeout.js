@@ -5,7 +5,7 @@ const {
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const TIMEOUT_COLOR = '#ffaa00';
 const MAX_TIMEOUT_MINUTES = 40320; // Discord max timeout = 28 days
@@ -166,6 +166,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const user = interaction.options.getUser('user', true);
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
         const minutes = interaction.options.getInteger('minutes', true);

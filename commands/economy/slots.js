@@ -8,7 +8,7 @@ const {
     formatMoney,
     formatTime
 } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const COOLDOWN = 30 * 1000;
 const MIN_BET = 50;
@@ -44,7 +44,7 @@ module.exports = {
         PermissionFlagsBits.EmbedLinks,
         PermissionFlagsBits.SendMessages
     ],
-    cooldown: 30,
+    cooldown: 0,
 
     slashData: new SlashCommandBuilder()
         .setName('slots')
@@ -59,6 +59,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger('bet', true);

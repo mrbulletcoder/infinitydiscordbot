@@ -206,32 +206,100 @@ async function punish(message, reason, type) {
         const guildId = message.guild.id;
         const userId = message.author.id;
 
-        await message.delete().catch(() => {});
+        message.client.recentAutomodDeletes ??= new Map();
+
+        message.client.recentAutomodDeletes.set(message.id, {
+            executor: message.client.user,
+            reason,
+            type,
+            deletedAt: Date.now()
+        });
+
+        setTimeout(() => {
+            message.client.recentAutomodDeletes?.delete(message.id);
+        }, 15_000);
+
+        await message.delete().catch(() => { });
 
         const offenseCount = await incrementOffense(guildId, userId);
         const rule = await getPunishment(guildId, type, offenseCount);
 
         let action = '⚠️ Warn';
         let color = '#ffff00';
+        let shouldKick = false;
+        let timeoutDuration = null;
 
         if (typeof rule === 'string' && rule.startsWith('timeout:')) {
             action = '⏳ Timeout';
             color = '#ffaa00';
-
-            const duration = parseInt(rule.split(':')[1], 10);
-
-            if (message.member.moderatable && duration) {
-                await message.member.timeout(duration, reason).catch(() => {});
-            }
+            timeoutDuration = parseInt(rule.split(':')[1], 10);
         } else if (rule === 'kick') {
             action = '👢 Kick';
             color = '#ff0000';
-
-            if (message.member.kickable) {
-                await message.member.kick(reason).catch(() => {});
-            }
+            shouldKick = true;
         }
 
+        // ✅ Send channel notice FIRST
+        const embed = new EmbedBuilder()
+            .setColor(color)
+            .setAuthor({
+                name: '🤖 Infinity AutoMod',
+                iconURL: message.guild.iconURL({ dynamic: true }) || undefined
+            })
+            .setDescription(`⚠️ ${message.author} triggered AutoMod.`)
+            .addFields(
+                {
+                    name: '👤 User',
+                    value: `${message.author.tag}\n\`${message.author.id}\``,
+                    inline: true
+                },
+                {
+                    name: '📍 Channel',
+                    value: `${message.channel}\n\`${message.channel.id}\``,
+                    inline: true
+                },
+                {
+                    name: '📌 Action Taken',
+                    value: [
+                        '```yaml',
+                        `Action: ${action}`,
+                        `Offense: #${offenseCount}`,
+                        `Rule: ${type}`,
+                        '```'
+                    ].join('\n'),
+                    inline: false
+                },
+                {
+                    name: '📄 Reason',
+                    value: [
+                        '```',
+                        reason,
+                        '```'
+                    ].join('\n'),
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Infinity AutoMod • Protection System' })
+            .setTimestamp();
+
+        const notice = await message.channel.send({ embeds: [embed] }).catch(() => null);
+
+        if (notice) {
+            setTimeout(() => {
+                notice.delete().catch(() => { });
+            }, 20_000);
+        }
+
+        // ✅ Then apply punishment
+        if (timeoutDuration && message.member.moderatable) {
+            await message.member.timeout(timeoutDuration, reason).catch(() => { });
+        }
+
+        if (shouldKick && message.member.kickable) {
+            await message.member.kick(reason).catch(() => { });
+        }
+
+        // ✅ Then log to modlogs
         await logAction({
             client: message.client,
             guild: message.guild,
@@ -241,27 +309,6 @@ async function punish(message, reason, type) {
             reason: `${reason} (Offense #${offenseCount})`,
             color
         });
-
-        const embed = new EmbedBuilder()
-            .setColor(color)
-            .setAuthor({
-                name: '🤖 AutoMod Action',
-                iconURL: message.guild.iconURL() || null
-            })
-            .setDescription(`⚠️ ${message.author}`)
-            .addFields(
-                { name: '📌 Reason', value: reason },
-                { name: '⚙️ Action', value: action, inline: true },
-                { name: '📊 Offense', value: `#${offenseCount}`, inline: true }
-            )
-            .setFooter({ text: 'Infinity AutoMod System' })
-            .setTimestamp();
-
-        const reply = await message.channel.send({ embeds: [embed] });
-
-        setTimeout(() => {
-            reply.delete().catch(() => {});
-        }, DISPLAY_TIME);
     } catch (error) {
         logError('AUTOMOD PUNISH', error, {
             guild: message.guild ? `${message.guild.name} (${message.guild.id})` : 'Unknown',

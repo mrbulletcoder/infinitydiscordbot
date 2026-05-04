@@ -11,7 +11,7 @@ const {
 } = require('../../utils/checkPermissions');
 const { insertWarning } = require('../../utils/moderationDb');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const WARN_COLOR = '#ffcc00';
 
@@ -198,6 +198,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const reason = interaction.options.getString('reason') || 'No reason provided';

@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, formatMoney } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 function respond(ctx, options) {
     if (ctx.user) {
@@ -36,6 +36,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const target = interaction.options.getUser('user') || interaction.user;
         return sendBalance(interaction, target);
     }

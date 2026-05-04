@@ -2,11 +2,11 @@ const {
     AuditLogEvent,
     SUCCESS_COLOR,
     fetchAuditEntry,
-    formatRole,
     formatUser,
     inlineCode,
     sendAdvancedLog,
-    yesNo
+    yesNo,
+    block
 } = require('../utils/advancedLogger');
 
 module.exports = {
@@ -21,12 +21,32 @@ module.exports = {
                 title: 'Role Created',
                 description: 'A new role was created in the server.',
                 fields: [
-                    { name: '🎭 Role', value: formatRole(role), inline: true },
-                    { name: '🛡️ Created By', value: formatUser(audit?.executor, 'Unknown Moderator'), inline: true },
-                    { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                    { name: '🎨 Color', value: inlineCode(role.hexColor), inline: true },
-                    { name: '📌 Position', value: inlineCode(role.position), inline: true },
-                    { name: '🔔 Mentionable', value: yesNo(role.mentionable), inline: true }
+                    {
+                        name: '🎭 Role',
+                        value: `**${role.name || 'Unknown Role'}**\n\`${role.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Created By',
+                        value: formatUser(audit?.executor, 'Unknown Moderator'),
+                        inline: true
+                    },
+                    {
+                        name: '📌 Role Details',
+                        value: [
+                            '```yaml',
+                            `Color: ${role.hexColor}`,
+                            `Position: ${role.position}`,
+                            `Mentionable: ${yesNo(role.mentionable)}`,
+                            '```'
+                        ].join('\n'),
+                        inline: false
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: audit?.reason ? block(audit.reason) : '`No reason provided.`',
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

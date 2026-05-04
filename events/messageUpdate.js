@@ -24,11 +24,36 @@ module.exports = {
                 url: newMessage.url,
                 thumbnail: newMessage.author?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null,
                 fields: [
-                    { name: '👤 Author', value: formatUser(newMessage.author), inline: true },
-                    { name: '📍 Channel', value: formatChannel(newMessage.channel), inline: true },
-                    { name: '🔗 Message', value: `[Jump to Message](${newMessage.url})`, inline: true },
-                    { name: 'Before', value: block(oldMessage.content), inline: false },
-                    { name: 'After', value: block(newMessage.content), inline: false }
+                    {
+                        name: '👤 Author',
+                        value: formatUser(newMessage.author),
+                        inline: true
+                    },
+                    {
+                        name: '📍 Channel',
+                        value: formatChannel(newMessage.channel),
+                        inline: true
+                    },
+                    {
+                        name: '🔗 Message',
+                        value: `[Jump to Message](${newMessage.url})`,
+                        inline: true
+                    },
+                    {
+                        name: '📌 Edit Details',
+                        value: '```yaml\nType: Message Edited\n```',
+                        inline: false
+                    },
+                    {
+                        name: '📝 Before',
+                        value: block(oldMessage.content || 'No content'),
+                        inline: false
+                    },
+                    {
+                        name: '📝 After',
+                        value: block(newMessage.content || 'No content'),
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

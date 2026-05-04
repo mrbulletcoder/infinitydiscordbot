@@ -7,7 +7,7 @@ const {
     getShopItems,
     formatMoney
 } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'buy',
@@ -44,6 +44,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
         const itemId = interaction.options.getString('item', true);

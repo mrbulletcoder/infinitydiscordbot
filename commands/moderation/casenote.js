@@ -11,7 +11,7 @@ const {
     getCaseNoteCount
 } = require('../../utils/moderationDb');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
@@ -56,6 +56,9 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const caseNumber = interaction.options.getInteger('number', true);
         const note = interaction.options.getString('note', true).trim();
         const createdAt = Math.floor(Date.now() / 1000);

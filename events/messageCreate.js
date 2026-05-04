@@ -28,7 +28,7 @@ async function handlePrefixCooldown(message, command) {
 
     const cooldowns = message.client.cooldowns;
     const commandName = command.name || 'unknown';
-    const key = `${message.author.id}:${commandName}:prefix`;
+    const key = `${message.guild.id}:${message.author.id}:${commandName}:prefix`;
     const cooldownSeconds = getCommandCooldown(command);
 
     if (cooldownSeconds <= 0) return false;

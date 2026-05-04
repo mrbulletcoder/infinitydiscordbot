@@ -11,7 +11,7 @@ const {
     getCasesByAction
 } = require('../../utils/moderationDb');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
@@ -126,6 +126,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
         const targetUser = interaction.options.getUser('user');
         const targetModerator = interaction.options.getUser('moderator');
@@ -136,13 +138,13 @@ module.exports = {
         const filtersUsed = [targetUser, targetModerator, action, recent].filter(Boolean).length;
 
         if (filtersUsed === 0) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 embeds: [errorEmbed('Choose one filter: user, moderator, action, or recent.')]
             }, true);
         }
 
         if (filtersUsed > 1) {
-            return safeReply(interaction,{
+            return safeReply(interaction, {
                 embeds: [errorEmbed('Use only one filter at a time.')]
             }, true);
         }
@@ -154,13 +156,13 @@ module.exports = {
             result = await getCasesForUser(interaction.guild.id, targetUser.id, limit);
 
             if (!result.ok) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('Failed to fetch case history.')]
                 }, true);
             }
 
             if (!result.rows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('No case history found for that user.')]
                 }, true);
             }
@@ -176,13 +178,13 @@ module.exports = {
             result = await getCasesByModerator(interaction.guild.id, targetModerator.id, limit);
 
             if (!result.ok) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('Failed to fetch moderator cases.')]
                 }, true);
             }
 
             if (!result.rows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('No cases found for that moderator.')]
                 }, true);
             }
@@ -198,13 +200,13 @@ module.exports = {
             result = await getCasesByAction(interaction.guild.id, action, limit);
 
             if (!result.ok) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('Failed to fetch action-filtered cases.')]
                 }, true);
             }
 
             if (!result.rows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed(`No ${action.toLowerCase()} cases found.`)]
                 }, true);
             }
@@ -220,13 +222,13 @@ module.exports = {
             result = await getRecentCases(interaction.guild.id, limit);
 
             if (!result.ok) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('Failed to fetch recent cases.')]
                 }, true);
             }
 
             if (!result.rows.length) {
-                return safeReply(interaction,{
+                return safeReply(interaction, {
                     embeds: [errorEmbed('No recent cases found.')]
                 }, true);
             }
@@ -240,6 +242,6 @@ module.exports = {
             });
         }
 
-        return safeReply(interaction,{ embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, true);
     }
 };

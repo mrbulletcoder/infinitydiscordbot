@@ -2,7 +2,6 @@ const {
     AuditLogEvent,
     EDIT_COLOR,
     fetchAuditEntry,
-    formatRole,
     formatUser,
     inlineCode,
     sendAdvancedLog,
@@ -36,10 +35,25 @@ module.exports = {
                 title: 'Role Updated',
                 description: 'A role setting was changed.',
                 fields: [
-                    { name: '🎭 Role', value: formatRole(newRole), inline: true },
-                    { name: '🛡️ Updated By', value: formatUser(audit?.executor, 'Unknown Moderator'), inline: true },
-                    { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                    { name: `📝 Changes (${changes.length})`, value: changes.join('\n'), inline: false }
+                    {
+                        name: '🎭 Role',
+                        value: `**${newRole.name || oldRole.name || 'Unknown Role'}**\n\`${newRole.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Updated By',
+                        value: formatUser(audit?.executor, 'Unknown Moderator'),
+                        inline: true
+                    },
+                    {
+                        name: '📌 Changes',
+                        value: [
+                            '```diff',
+                            ...changes.map(c => `+ ${c}`),
+                            '```'
+                        ].join('\n'),
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, formatMoney } = require('../../utils/economy');
 const { pool } = require('../../database');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'deposit',
@@ -23,6 +23,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const amount = interaction.options.getInteger('amount', true);
         const userId = interaction.user.id;
         const guildId = interaction.guild.id;

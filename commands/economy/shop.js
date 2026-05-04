@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getShopItems, formatMoney } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'shop',
@@ -17,6 +17,9 @@ module.exports = {
         .setDescription('View the economy shop'),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const items = getShopItems();
 
         const embed = new EmbedBuilder()

@@ -5,7 +5,7 @@ const {
     ChannelType
 } = require('discord.js');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const logAction = require('../../utils/logAction');
 
@@ -69,6 +69,9 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const seconds = interaction.options.getInteger('seconds', true);
         const channel = interaction.options.getChannel('channel') || interaction.channel;
         const reason = interaction.options.getString('reason') || 'No reason provided';

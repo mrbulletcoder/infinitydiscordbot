@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder, MessageFlags } = require('discord.js');
 const { CATEGORY_LABELS, getLogSettings, setIgnoredChannel, setLogChannel, setLoggingEnabled } = require('../../utils/advancedLogger');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const choices = [
     { name: 'Message Logs', value: 'message' }, { name: 'Member Logs', value: 'member' },
@@ -40,6 +40,9 @@ module.exports = {
             .addChannelOption(o => o.setName('channel').setDescription('Channel').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setRequired(true))),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         try {
             const sub = interaction.options.getSubcommand();
             const guildId = interaction.guild.id;

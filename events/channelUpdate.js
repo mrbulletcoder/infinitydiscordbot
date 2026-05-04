@@ -61,10 +61,25 @@ module.exports = {
                 title: 'Channel Updated',
                 description: 'A channel setting was changed.',
                 fields: [
-                    { name: '📍 Channel', value: formatChannel(newChannel), inline: true },
-                    { name: '🛡️ Updated By', value: formatUser(audit?.executor, 'Unknown Moderator'), inline: true },
-                    { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                    { name: `📝 Changes (${changes.length})`, value: changes.join('\n'), inline: false }
+                    {
+                        name: '📍 Channel',
+                        value: `#${newChannel.name || oldChannel.name || 'unknown'}\n\`${newChannel.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Updated By',
+                        value: formatUser(audit?.executor, 'Unknown Moderator'),
+                        inline: true
+                    },
+                    {
+                        name: '📌 Changes',
+                        value: [
+                            '```diff',
+                            ...changes.map(c => `+ ${c}`),
+                            '```'
+                        ].join('\n'),
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

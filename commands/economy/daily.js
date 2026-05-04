@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, addWallet, formatMoney, formatTime } = require('../../utils/economy');
 const { pool } = require('../../database');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
 const BASE_REWARD = 1000;
@@ -22,7 +22,7 @@ module.exports = {
     botPermissions: [
         PermissionFlagsBits.EmbedLinks
     ],
-    cooldown: 86400,
+    cooldown: 0,
 
     slashData: new SlashCommandBuilder()
         .setName('daily')
@@ -33,6 +33,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         return claimDaily(interaction);
     }
 };

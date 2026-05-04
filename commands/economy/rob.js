@@ -9,7 +9,7 @@ const {
     formatTime,
     getInventory
 } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const COOLDOWN = 15 * 60 * 1000;
 const MIN_TARGET_WALLET = 500;
@@ -24,7 +24,7 @@ module.exports = {
         PermissionFlagsBits.EmbedLinks,
         PermissionFlagsBits.SendMessages
     ],
-    cooldown: 900,
+    cooldown: 0,
 
     slashData: new SlashCommandBuilder()
         .setName('rob')
@@ -37,6 +37,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         const guildId = interaction.guild.id;
         const robber = interaction.user;
         const target = interaction.options.getUser('user', true);

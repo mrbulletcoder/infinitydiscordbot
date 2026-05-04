@@ -4,7 +4,8 @@ const {
     fetchAuditEntry,
     findRecentCaseModerator,
     formatUser,
-    sendAdvancedLog
+    sendAdvancedLog,
+    block
 } = require('../utils/advancedLogger');
 
 module.exports = {
@@ -25,10 +26,36 @@ module.exports = {
                 description: 'A user has been banned from the server.',
                 thumbnail: ban.user.displayAvatarURL({ dynamic: true, size: 256 }),
                 fields: [
-                    { name: '👤 User', value: formatUser(ban.user), inline: true },
-                    { name: '🛡️ Banned By', value: formatUser(executor, 'Unknown Moderator'), inline: true },
-                    { name: '📁 Case', value: caseMatch?.caseNumber ? `\`#${caseMatch.caseNumber}\`` : '`No case linked`', inline: true },
-                    { name: '📄 Reason', value: `> ${reason}`, inline: false }
+                    {
+                        name: '👤 User',
+                        value: formatUser(ban.user),
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Moderator',
+                        value: formatUser(executor, 'Unknown Moderator'),
+                        inline: true
+                    },
+                    {
+                        name: '📁 Case',
+                        value: caseMatch?.caseNumber ? `\`#${caseMatch.caseNumber}\`` : '`No case linked`',
+                        inline: true
+                    },
+                    {
+                        name: '📌 Action Details',
+                        value: [
+                            '```yaml',
+                            `Action: ${title}`,
+                            'Source: Infinity Moderation',
+                            '```'
+                        ].join('\n'),
+                        inline: false
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: block(reason),
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

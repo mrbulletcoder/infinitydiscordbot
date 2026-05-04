@@ -9,7 +9,7 @@ const {
 
 const { pool } = require('../../database');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const recentReportPairs = new Map();
 const recentReporterWindows = new Map();
@@ -455,6 +455,10 @@ module.exports = {
     },
 
     async handleReport({ ctx, guild, reporter, target, reason, isSlash = false }) {
+
+        if (isSlash) {
+            await safeDefer(ctx, true);
+        }
 
         const reply = (payload) => {
             return isSlash

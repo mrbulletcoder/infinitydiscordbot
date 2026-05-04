@@ -6,7 +6,7 @@ const {
 } = require('discord.js');
 const { pool } = require('../../database');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'applicationconfig',
@@ -47,6 +47,8 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
         const panel = interaction.options.getChannel('panel', true);
         const review = interaction.options.getChannel('review', true);

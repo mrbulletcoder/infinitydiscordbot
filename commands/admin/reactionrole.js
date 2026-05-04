@@ -14,7 +14,7 @@ const {
     syncPanelReactions
 } = require('../../utils/reactionRoles');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
@@ -432,6 +432,8 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
         try {
             const sub = interaction.options.getSubcommand();
@@ -498,7 +500,7 @@ module.exports = {
                         `Updated category **${updatedCategory.name}**.`,
                         panelResult ? `Refreshed **${panelResult.updatedCount}** panel(s).` : null
                     ].filter(Boolean).join('\n'))]
-                }.true);
+                }, true);
             }
 
             if (sub === 'addrole') {
@@ -726,7 +728,7 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] });
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 const [result] = await pool.query(
@@ -758,7 +760,7 @@ module.exports = {
 
                 const category = await getCategoryByName(guildId, categoryName);
                 if (!category) {
-                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] });
+                    return safeReply(interaction, { embeds: [errorEmbed('That category does not exist.')] }, true);
                 }
 
                 await pool.query(`DELETE FROM reaction_role_messages WHERE guild_id = ? AND category_id = ?`, [guildId, category.id]);

@@ -13,7 +13,7 @@ const {
 
 const logAction = require('../../utils/logAction');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const DELETE_COLOR = '#ff3b30';
 const ERROR_COLOR = '#ff4d4d';
@@ -52,6 +52,9 @@ module.exports = {
 
     async executeSlash(interaction) {
         try {
+            const deferred = await safeDefer(interaction, true);
+            if (!deferred) return;
+
             const caseNumber = interaction.options.getInteger('number', true);
 
             const existing = await getCaseByNumber(interaction.guild.id, caseNumber);

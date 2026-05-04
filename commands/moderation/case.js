@@ -10,7 +10,7 @@ const {
     getCaseNotes
 } = require('../../utils/moderationDb');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#00bfff';
 const ERROR_COLOR = '#ff4d4d';
@@ -148,6 +148,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const caseId = interaction.options.getInteger('number', true);
         const result = await getCaseByNumber(interaction.guild.id, caseId);
 

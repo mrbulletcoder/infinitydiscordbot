@@ -9,7 +9,7 @@ const {
 
 const { safeReply } = require('../../handlers/interactions/safeReply');
 
-const CLIENT_ID = '1485150070944043078'; // your bot ID
+const CLIENT_ID = process.env.CLIENT_ID;
 const INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
 
 module.exports = {
@@ -17,6 +17,7 @@ module.exports = {
     description: 'Get the invite link for Infinity.',
     usage: '!invite / /invite',
     category: 'general',
+    dmAllowed: true,
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()

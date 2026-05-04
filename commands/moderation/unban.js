@@ -7,7 +7,7 @@ const {
 
 const logAction = require('../../utils/logAction');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const UNBAN_COLOR = '#57f287';
 
@@ -33,7 +33,7 @@ function buildUnbanEmbed({ user, moderator, reason, guild, caseNumber = null }) 
         .addFields(
             { name: '👤 User', value: formatUser(user), inline: true },
             { name: '🛡️ Moderator', value: formatUser(moderator), inline: true },
-            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`', inline: true },
+            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`No case created`', inline: true },
             { name: '📄 Reason', value: `> ${reason}`, inline: false }
         )
         .setFooter({ text: `${guild.name} • Moderation` })
@@ -56,7 +56,8 @@ async function runUnban({ client, guild, userId, moderator, reason }) {
         user,
         moderator,
         reason,
-        color: UNBAN_COLOR
+        color: UNBAN_COLOR,
+        createCase: false
     });
 
     return { user, caseNumber: getCaseNumber(logResult) };
@@ -122,45 +123,48 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-    const userId = interaction.options.getString('userid', true);
-    const reason = interaction.options.getString('reason') || 'No reason provided';
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
-    if (!/^\d{17,20}$/.test(userId)) {
-        return safeReply(interaction, {
-            content: '❌ Provide a valid banned user ID.'
-        }, true);
-    }
+        const userId = interaction.options.getString('userid', true);
+        const reason = interaction.options.getString('reason') || 'No reason provided';
 
-    try {
-        const result = await runUnban({
-            client: interaction.client,
-            guild: interaction.guild,
-            userId,
-            moderator: interaction.user,
-            reason
-        });
-
-        if (result.error) {
+        if (!/^\d{17,20}$/.test(userId)) {
             return safeReply(interaction, {
-                content: `❌ ${result.error}`
+                content: '❌ Provide a valid banned user ID.'
             }, true);
         }
 
-        return safeReply(interaction, {
-            embeds: [buildUnbanEmbed({
-                user: result.user,
-                moderator: interaction.user,
-                reason,
+        try {
+            const result = await runUnban({
+                client: interaction.client,
                 guild: interaction.guild,
-                caseNumber: result.caseNumber
-            })]
-        }, true);
-    } catch (error) {
-        console.error('Unban Command Error:', error);
+                userId,
+                moderator: interaction.user,
+                reason
+            });
 
-        return safeReply(interaction, {
-            content: '❌ Failed to unban user.'
-        }, true);
+            if (result.error) {
+                return safeReply(interaction, {
+                    content: `❌ ${result.error}`
+                }, true);
+            }
+
+            return safeReply(interaction, {
+                embeds: [buildUnbanEmbed({
+                    user: result.user,
+                    moderator: interaction.user,
+                    reason,
+                    guild: interaction.guild,
+                    caseNumber: result.caseNumber
+                })]
+            }, true);
+        } catch (error) {
+            console.error('Unban Command Error:', error);
+
+            return safeReply(interaction, {
+                content: '❌ Failed to unban user.'
+            }, true);
+        }
     }
-}
 };

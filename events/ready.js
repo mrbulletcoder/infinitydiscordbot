@@ -8,23 +8,29 @@ module.exports = {
     once: true,
     async execute(client) {
         const permanentBio =
-            'Infinity is a premium moderation and server management bot built for modern Discord communities.';
+            'Infinity is an all-in-one Discord bot for moderation, AutoMod, tickets, economy, reaction roles, giveaways, and more. Built to keep your server safe, organized, and easy to use for everyone.';
 
         const rotatingActivities = [
-            { name: 'moderating with precision', type: ActivityType.Watching },
-            { name: 'protecting communities', type: ActivityType.Watching },
-            { name: '/help for commands', type: ActivityType.Listening },
-            { name: 'tickets • automod • moderation', type: ActivityType.Watching },
-            { name: 'server management done right', type: ActivityType.Playing },
-            { name: 'keeping servers safe', type: ActivityType.Watching },
+            { name: '/help • View all commands', type: ActivityType.Listening },
+            { name: '/invite • Add Infinity to your server', type: ActivityType.Watching },
+            { name: '/report • Report a member', type: ActivityType.Watching },
+            { name: '/daily • Claim your reward', type: ActivityType.Playing },
+            { name: '/balance • Check your coins', type: ActivityType.Playing },
+            { name: '/work • Earn coins', type: ActivityType.Playing },
+            { name: '/beg • Try your luck', type: ActivityType.Playing },
+            { name: 'AutoMod protecting chats', type: ActivityType.Watching },
+            { name: 'reaction roles & self roles', type: ActivityType.Watching },
+            { name: 'safe and easy server experience', type: ActivityType.Watching }
         ];
 
+        // ✅ Giveaway scheduler
         try {
             await initGiveawayScheduler(client);
         } catch (error) {
             console.error('Failed to initialize giveaway scheduler:', error);
         }
 
+        // ✅ Bot bio
         try {
             await client.application.fetch();
             await client.application.edit({
@@ -34,6 +40,7 @@ module.exports = {
             console.error('Failed to update application bio:', error);
         }
 
+        // ✅ Rotating activity
         try {
             let activityIndex = 0;
 
@@ -49,6 +56,24 @@ module.exports = {
             console.error('Failed to start rotating activity:', error);
         }
 
+        // 🔥 NEW: Automod delete cleanup system
+        client.recentAutomodDeletes ??= new Map();
+
+        if (!client.automodDeleteCleanupStarted) {
+            client.automodDeleteCleanupStarted = true;
+
+            setInterval(() => {
+                const now = Date.now();
+
+                for (const [messageId, data] of client.recentAutomodDeletes) {
+                    if (now - data.deletedAt > 15_000) {
+                        client.recentAutomodDeletes.delete(messageId);
+                    }
+                }
+            }, 30_000);
+        }
+
+        // ✅ Stats
         const stats = client.startupStats || {};
 
         const totalGuilds = client.guilds.cache.size;

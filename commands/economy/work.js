@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUser, addWallet, setCooldown, formatMoney, getRemaining, formatTime } = require('../../utils/economy');
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const WORK_COOLDOWN = 30 * 60 * 1000;
 
@@ -29,7 +29,7 @@ module.exports = {
     botPermissions: [
         PermissionFlagsBits.EmbedLinks
     ],
-    cooldown: 120,
+    cooldown: 0,
 
     slashData: new SlashCommandBuilder()
         .setName('work')
@@ -40,6 +40,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+        
         return work(interaction);
     }
 };

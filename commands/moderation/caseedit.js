@@ -12,7 +12,7 @@ const {
 
 const logAction = require('../../utils/logAction');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const BRAND_COLOR = '#ffaa00';
 const ERROR_COLOR = '#ff4d4d';
@@ -57,6 +57,9 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const caseNumber = interaction.options.getInteger('number', true);
         const newReason = interaction.options.getString('reason', true).trim();
 

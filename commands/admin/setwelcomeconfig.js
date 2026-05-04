@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder } = require('discord.js');
 const { pool } = require('../../database');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const defaultWelcome = {
     channel: null,
@@ -66,8 +66,10 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        try {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
+        try {
             const guildId = interaction.guild.id;
 
             const channel = interaction.options.getChannel('channel');
@@ -79,7 +81,7 @@ module.exports = {
             const role = interaction.options.getRole('role');
 
             if (!channel && !messageText && !title && !color && !rules && !chat && !role) {
-                return safeReply(interaction, '⚠️ You must provide at least one setting to update.'), true;
+                return safeReply(interaction, '⚠️ You must provide at least one setting to update.', true);
             }
 
             if (color && !isHexColor(color)) {
@@ -205,7 +207,7 @@ module.exports = {
             console.error('setwelcomeconfig error:', err);
 
             if (interaction.deferred) {
-                return safeReply(interaction, '❌ Something went wrong while updating welcome settings.'), true;
+                return safeReply(interaction, '❌ Something went wrong while updating welcome settings.', true);
             }
 
             return safeReply(interaction, {

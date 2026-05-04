@@ -6,7 +6,8 @@ const {
     formatMember,
     formatUser,
     sendAdvancedLog,
-    unix
+    unix,
+    block
 } = require('../utils/advancedLogger');
 
 module.exports = {
@@ -27,12 +28,38 @@ module.exports = {
                     : 'A member left the server.',
                 thumbnail: member.user.displayAvatarURL({ dynamic: true, size: 256 }),
                 fields: [
-                    { name: '👤 Member', value: formatMember(member), inline: true },
-                    { name: wasKicked ? '🛡️ Kicked By' : '🚪 Exit Type', value: wasKicked ? formatUser(audit.executor) : 'Voluntary Leave', inline: true },
-                    { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                    { name: '📅 Joined Server', value: joined ? `<t:${joined}:F>\n<t:${joined}:R>` : 'Unknown', inline: true },
-                    { name: '⏳ Time In Server', value: member.joinedTimestamp ? formatDuration(Date.now() - member.joinedTimestamp) : 'Unknown', inline: true },
-                    { name: '🗓️ Account Created', value: `<t:${accountCreated}:F>\n<t:${accountCreated}:R>`, inline: true }
+                    {
+                        name: '👤 Member',
+                        value: formatMember(member),
+                        inline: true
+                    },
+                    {
+                        name: wasKicked ? '🛡️ Kicked By' : '🚪 Exit Type',
+                        value: wasKicked ? formatUser(audit.executor) : '`Voluntary Leave`',
+                        inline: true
+                    },
+                    {
+                        name: '📌 Member Details',
+                        value: [
+                            '```yaml',
+                            `Action: ${wasKicked ? 'Member Kicked' : 'Member Left'}`,
+                            `Time In Server: ${member.joinedTimestamp ? formatDuration(Date.now() - member.joinedTimestamp) : 'Unknown'}`,
+                            '```'
+                        ].join('\n'),
+                        inline: false
+                    },
+                    {
+                        name: '📅 Join / Account Info',
+                        value:
+                            `**Joined Server:** ${joined ? `<t:${joined}:F>\n<t:${joined}:R>` : 'Unknown'}\n` +
+                            `**Account Created:** <t:${accountCreated}:F>\n<t:${accountCreated}:R>`,
+                        inline: false
+                    },
+                    {
+                        name: '📄 Reason',
+                        value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
+                        inline: false
+                    }
                 ]
             });
         } catch (error) {

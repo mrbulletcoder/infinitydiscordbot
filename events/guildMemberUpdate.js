@@ -10,7 +10,8 @@ const {
     formatMember,
     formatUser,
     sendAdvancedLog,
-    unix
+    unix,
+    block
 } = require('../utils/advancedLogger');
 
 function roleLines(ids) {
@@ -49,17 +50,44 @@ module.exports = {
                         : 'A member timeout has been removed.',
                     thumbnail: newMember.user.displayAvatarURL({ dynamic: true, size: 256 }),
                     fields: [
-                        { name: '👤 Member', value: formatMember(newMember), inline: true },
-                        { name: '🛡️ Moderator', value: formatUser(executor, 'Unknown Moderator'), inline: true },
-                        { name: '📁 Case', value: caseMatch?.caseNumber ? `\`#${caseMatch.caseNumber}\`` : '`No case linked`', inline: true },
                         {
-                            name: '⏱️ Timeout Details',
+                            name: '👤 Member',
+                            value: formatMember(newMember),
+                            inline: true
+                        },
+                        {
+                            name: '🛡️ Moderator',
+                            value: formatUser(executor, 'Unknown Moderator'),
+                            inline: true
+                        },
+                        {
+                            name: '📁 Case',
+                            value: caseMatch?.caseNumber ? `\`#${caseMatch.caseNumber}\`` : '`No case linked`',
+                            inline: true
+                        },
+                        {
+                            name: '📌 Timeout Details',
                             value: newTimeout
-                                ? `**Until:** <t:${unix(newTimeout)}:F>\n**Ends:** <t:${unix(newTimeout)}:R>\n**Duration Left:** ${formatDuration(newTimeout - Date.now())}`
-                                : '**Status:** Removed',
+                                ? [
+                                    '```yaml',
+                                    'Action: Member Timed Out',
+                                    `Until: ${new Date(newTimeout).toLocaleString()}`,
+                                    `Duration Left: ${formatDuration(newTimeout - Date.now())}`,
+                                    '```'
+                                ].join('\n')
+                                : [
+                                    '```yaml',
+                                    'Action: Timeout Removed',
+                                    'Status: Removed',
+                                    '```'
+                                ].join('\n'),
                             inline: false
                         },
-                        { name: '📄 Reason', value: `> ${reason}`, inline: false }
+                        {
+                            name: '📄 Reason',
+                            value: `> ${reason}`,
+                            inline: false
+                        }
                     ]
                 });
 
@@ -75,11 +103,31 @@ module.exports = {
                     description: 'A member nickname was changed.',
                     thumbnail: newMember.user.displayAvatarURL({ dynamic: true, size: 256 }),
                     fields: [
-                        { name: '👤 Member', value: formatMember(newMember), inline: true },
-                        { name: '🛡️ Changed By', value: formatUser(audit?.executor, 'Unknown Moderator'), inline: true },
-                        { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                        { name: 'Before', value: oldMember.nickname || oldMember.user.username, inline: true },
-                        { name: 'After', value: newMember.nickname || newMember.user.username, inline: true }
+                        {
+                            name: '👤 Member',
+                            value: formatMember(newMember),
+                            inline: true
+                        },
+                        {
+                            name: '🛡️ Changed By',
+                            value: formatUser(audit?.executor, 'Unknown Moderator'),
+                            inline: true
+                        },
+                        {
+                            name: '📌 Nickname Change',
+                            value: [
+                                '```diff',
+                                `- Before: ${oldMember.nickname || oldMember.user.username}`,
+                                `+ After: ${newMember.nickname || newMember.user.username}`,
+                                '```'
+                            ].join('\n'),
+                            inline: false
+                        },
+                        {
+                            name: '📄 Reason',
+                            value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
+                            inline: false
+                        }
                     ]
                 });
             }
@@ -98,11 +146,41 @@ module.exports = {
                     description: 'A member had their roles changed.',
                     thumbnail: newMember.user.displayAvatarURL({ dynamic: true, size: 256 }),
                     fields: [
-                        { name: '👤 Member', value: formatMember(newMember), inline: true },
-                        { name: '🛡️ Changed By', value: formatUser(audit?.executor, 'Unknown Moderator'), inline: true },
-                        { name: '📄 Reason', value: audit?.reason || 'No reason provided', inline: true },
-                        ...(added.length ? [{ name: `➕ Roles Added (${added.length})`, value: roleLines(added), inline: false }] : []),
-                        ...(removed.length ? [{ name: `➖ Roles Removed (${removed.length})`, value: roleLines(removed), inline: false }] : [])
+                        {
+                            name: '👤 Member',
+                            value: formatMember(newMember),
+                            inline: true
+                        },
+                        {
+                            name: '🛡️ Changed By',
+                            value: formatUser(audit?.executor, 'Unknown Moderator'),
+                            inline: true
+                        },
+                        {
+                            name: '📌 Role Changes',
+                            value: [
+                                '```yaml',
+                                `Roles Added: ${added.length}`,
+                                `Roles Removed: ${removed.length}`,
+                                '```'
+                            ].join('\n'),
+                            inline: false
+                        },
+                        ...(added.length ? [{
+                            name: `➕ Roles Added (${added.length})`,
+                            value: roleLines(added),
+                            inline: false
+                        }] : []),
+                        ...(removed.length ? [{
+                            name: `➖ Roles Removed (${removed.length})`,
+                            value: roleLines(removed),
+                            inline: false
+                        }] : []),
+                        {
+                            name: '📄 Reason',
+                            value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
+                            inline: false
+                        }
                     ]
                 });
             }

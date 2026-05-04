@@ -126,9 +126,11 @@ module.exports = async function logAction({
     const actionName = cleanActionName(action);
     const logged = await sendAdvancedLog(guild, 'moderation', {
         color: color || '#00bfff',
-        title: caseNumber ? `${action || 'Moderation Action'} • Case #${caseNumber}` : `${action || 'Moderation Action'}`,
+        title: caseNumber
+            ? `${action || 'Moderation Action'} • Case #${caseNumber}`
+            : `${action || 'Moderation Action'}`,
         description: 'A moderation action was recorded by Infinity.',
-        thumbnail: targetUser?.displayAvatarURL?.({ dynamic: true }) || null,
+        thumbnail: targetUser?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null,
         fields: [
             {
                 name: '👤 Target',
@@ -146,13 +148,32 @@ module.exports = async function logAction({
                 inline: true
             },
             {
+                name: '📌 Action Details',
+                value: [
+                    '```yaml',
+                    `Action: ${actionName}`,
+                    `Case: ${caseNumber ? `#${caseNumber}` : 'No case created'}`,
+                    `Source: ${modUser?.bot ? 'Infinity AutoMod / Bot Action' : 'Moderator Action'}`,
+                    '```'
+                ].join('\n'),
+                inline: false
+            },
+            {
                 name: '📄 Reason',
-                value: reason || 'No reason provided',
+                value: [
+                    '```',
+                    reason || 'No reason provided',
+                    '```'
+                ].join('\n'),
                 inline: false
             },
             ...(extra ? [{
-                name: '📌 Extra',
-                value: String(extra).slice(0, 1024),
+                name: '📌 Extra Details',
+                value: [
+                    '```',
+                    String(extra).slice(0, 1000),
+                    '```'
+                ].join('\n'),
                 inline: false
             }] : []),
             {

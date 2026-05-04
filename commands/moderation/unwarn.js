@@ -14,7 +14,7 @@ const {
     deleteWarningById
 } = require('../../utils/moderationDb');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const UNWARN_COLOR = '#57f287';
 
@@ -37,7 +37,7 @@ function buildUnwarnEmbed({ user, moderator, warningNumber, warningId, removedRe
         .addFields(
             { name: '👤 Member', value: formatUser(user), inline: true },
             { name: '🛡️ Moderator', value: formatUser(moderator), inline: true },
-            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`', inline: true },
+            { name: '📁 Case', value: caseNumber ? `\`#${caseNumber}\`` : '`No case created`', inline: true },
             { name: '🧾 Removed Warning', value: `Position: **#${warningNumber}**\nDatabase ID: \`${warningId}\``, inline: true },
             { name: '📊 Remaining', value: `**${remainingWarnings}** warning${remainingWarnings === 1 ? '' : 's'}`, inline: true },
             { name: '📄 Original Reason', value: `> ${removedReason}`, inline: false }
@@ -95,6 +95,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const targetUser = interaction.options.getUser('user', true);
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
         const warningNumber = interaction.options.getInteger('warning', true);
@@ -150,6 +153,7 @@ async function removeWarning({ client, guild, targetUser, warningNumber, moderat
             moderator,
             reason: `Removed warning #${warningNumber}: ${removedReason}`,
             color: UNWARN_COLOR,
+            createCase: false,
             extra: [
                 `**Removed Warning Position:** #${warningNumber}`,
                 `**Warning Database ID:** \`${warning.id}\``,

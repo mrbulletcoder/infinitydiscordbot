@@ -10,7 +10,7 @@ const {
     checkSlashHierarchy
 } = require('../../utils/checkPermissions');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const UNTIMEOUT_COLOR = '#57f287';
 
@@ -46,7 +46,7 @@ function buildUntimeoutEmbed({ member, moderator, reason, guild, previousTimeout
             },
             {
                 name: '📁 Case',
-                value: caseNumber ? `\`#${caseNumber}\`` : '`Pending`',
+                value: caseNumber ? `\`#${caseNumber}\`` : '`No case created`',
                 inline: true
             },
             {
@@ -79,6 +79,7 @@ async function runUntimeout({ client, guild, member, moderator, reason }) {
         moderator,
         reason,
         color: UNTIMEOUT_COLOR,
+        createCase: false,
         extra: previousTimeoutUnix
             ? `**Previous Timeout Until:** <t:${previousTimeoutUnix}:F>\n**Previous Timeout Relative:** <t:${previousTimeoutUnix}:R>`
             : null
@@ -159,6 +160,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const user = interaction.options.getUser('user', true);
         const member = await interaction.guild.members.fetch(user.id).catch(() => null);
         const reason = interaction.options.getString('reason') || 'Timeout removed';

@@ -17,7 +17,7 @@ const {
     editGiveawayMessage
 } = require('../../utils/giveaway');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'giveaway',
@@ -215,6 +215,8 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
         try {
             const sub = interaction.options.getSubcommand();
@@ -235,7 +237,7 @@ module.exports = {
                 if (!durationMs || durationMs < 10_000) {
                     return safeReply(interaction, {
                         content: '❌ Duration must be at least **10s**. Example: `10m`, `1h`, `2d`'
-                    });
+                    }, true);
                 }
 
                 const createdAt = Date.now();
@@ -322,7 +324,7 @@ module.exports = {
                     if (!durationMs || durationMs < 10_000) {
                         return safeReply(interaction, {
                             content: '❌ Duration must be at least **10s**.'
-                        });
+                        }, true);
                     }
                     endAt = Date.now() + durationMs;
                 }
