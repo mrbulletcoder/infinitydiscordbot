@@ -25,9 +25,6 @@ module.exports = {
     description: 'View detailed information about Infinity.',
     usage: '/botinfo',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 10,
 
     slashData: new SlashCommandBuilder()

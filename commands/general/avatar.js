@@ -46,9 +46,6 @@ module.exports = {
     description: 'View a user avatar in high quality.',
     usage: '!avatar [user] / /avatar [user]',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()

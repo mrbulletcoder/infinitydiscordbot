@@ -97,7 +97,6 @@ module.exports = {
     description: 'Check bot performance stats',
     usage: '!ping, /ping',
     category: 'general',
-    botPermissions: [],
     cooldown: 3,
 
     slashData: new SlashCommandBuilder()

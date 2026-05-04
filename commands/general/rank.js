@@ -14,9 +14,6 @@ module.exports = {
     name: 'rank',
     description: 'View a user rank card.',
     usage: '/rank [user]',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()

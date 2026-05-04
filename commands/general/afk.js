@@ -13,9 +13,6 @@ module.exports = {
     description: 'Set your AFK status.',
     usage: '!afk [reason] / /afk [reason]',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()

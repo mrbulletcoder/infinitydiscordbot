@@ -17,9 +17,6 @@ module.exports = {
     description: 'Get the invite link for Infinity.',
     usage: '!invite / /invite',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()
@@ -49,8 +46,8 @@ module.exports = {
                 {
                     name: '🔐 Permissions',
                     value:
-                        'Infinity only requests the permissions it needs to function properly.\n' +
-                        'No administrator permission is required.',
+                        'Infinity requests Administrator permission so all systems can work correctly across any server.\n' +
+                        'Server owners can still manage Infinity’s role and channel access after inviting it.',
                     inline: false
                 }
             )

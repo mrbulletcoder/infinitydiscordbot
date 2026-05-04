@@ -99,9 +99,6 @@ module.exports = {
     description: 'View detailed information about the server.',
     usage: '!server-stats / /server-stats',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 10,
 
     slashData: new SlashCommandBuilder()

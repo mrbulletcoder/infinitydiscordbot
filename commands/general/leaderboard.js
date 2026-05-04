@@ -15,9 +15,6 @@ module.exports = {
     name: 'leaderboard',
     description: 'View the server XP leaderboard.',
     usage: '/leaderboard',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 15,
 
     slashData: new SlashCommandBuilder()

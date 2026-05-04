@@ -124,9 +124,6 @@ module.exports = {
     description: 'View detailed information about a user.',
     usage: '!user-info [user] / /user-info [user]',
     category: 'general',
-    botPermissions: [
-        PermissionFlagsBits.EmbedLinks
-    ],
     cooldown: 5,
 
     slashData: new SlashCommandBuilder()

@@ -429,6 +429,12 @@ async function handleCloseTicket(interaction, ticketId) {
 
 async function handleCloseTicketConfirm(interaction, ticketId) {
     try {
+        await interaction.update({
+            content: '🔒 Closing ticket...',
+            components: [],
+            embeds: []
+        }).catch(() => null);
+
         const settings = await getTicketSettings(interaction.guild.id);
 
         const isStaff =
@@ -514,9 +520,10 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
             [Date.now(), ticket.id]
         );
 
-        await interaction.editReply({
-            content: '🔒 Ticket closed. This channel will be deleted in 5 seconds.'
-        });
+        await interaction.followUp({
+            content: '🔒 Ticket closed. This channel will be deleted in 5 seconds.',
+            flags: 64
+        }).catch(() => null);
 
         setTimeout(async () => {
             await interaction.channel.delete().catch(() => null);
@@ -530,7 +537,7 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
             }, true).catch(() => { });
         }
 
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Failed to close ticket.',
         }, true).catch(() => { });
     }
