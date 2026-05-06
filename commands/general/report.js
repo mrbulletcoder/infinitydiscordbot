@@ -441,6 +441,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const targetUser = interaction.options.getUser('user', true);
         const reason = interaction.options.getString('reason', true).trim();
 
@@ -455,10 +458,6 @@ module.exports = {
     },
 
     async handleReport({ ctx, guild, reporter, target, reason, isSlash = false }) {
-
-        if (isSlash) {
-            await safeDefer(ctx, true);
-        }
 
         const reply = (payload) => {
             return isSlash

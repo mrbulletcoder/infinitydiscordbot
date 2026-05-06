@@ -61,6 +61,21 @@ async function safeDefer(interaction, ephemeral = false) {
     }
 }
 
+async function safeDeferUpdate(interaction) {
+    try {
+        if (!interaction) return false;
+        if (interaction.deferred || interaction.replied) return true;
+
+        await interaction.deferUpdate();
+        return true;
+    } catch (error) {
+        if (error.code === 10062 || error.code === 40060) return false;
+
+        console.error('Failed to defer interaction update:', error);
+        return false;
+    }
+}
+
 async function safeRun(interaction, label, fn) {
     try {
         return await fn();
@@ -83,5 +98,6 @@ module.exports = {
     safeReply,
     safeErrorReply,
     safeDefer,
+    safeDeferUpdate,
     safeRun
 };

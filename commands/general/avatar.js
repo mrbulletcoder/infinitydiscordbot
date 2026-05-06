@@ -4,7 +4,7 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 function getAvatarLinks(user, member) {
     const globalPng = user.displayAvatarURL({ extension: 'png', size: 4096 });
@@ -73,6 +73,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 

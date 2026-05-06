@@ -37,8 +37,14 @@ const {
     handleDenyAppeal
 } = require('../../utils/appeals');
 
+const { handleSetupButton } = require('./setupMenuHandler');
+
 async function handleButton(interaction) {
     const { customId } = interaction;
+
+    if (customId.startsWith('setup_')) {
+        return safeRun(interaction, `button ${customId}`, () => handleSetupButton(interaction));
+    }
 
     if (customId.startsWith('appeal_claim_')) {
         const appealId = customId.split('_')[2];

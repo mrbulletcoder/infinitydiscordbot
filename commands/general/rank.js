@@ -8,7 +8,7 @@ const {
     buildRankCardAttachment
 } = require('../../utils/rank');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'rank',
@@ -27,6 +27,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         try {
             const targetUser = interaction.options.getUser('user') || interaction.user;
 

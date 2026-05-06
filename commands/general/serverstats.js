@@ -5,7 +5,7 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 function formatFullDate(date) {
     const unix = Math.floor(date.getTime() / 1000);
@@ -110,6 +110,9 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         return this.sendStats(interaction, interaction.guild, true);
     },
 

@@ -22,7 +22,7 @@ module.exports = {
                 return handleModal(interaction);
             }
 
-            if (interaction.isStringSelectMenu()) {
+            if (interaction.isStringSelectMenu() || interaction.isRoleSelectMenu()) {
                 return handleStringSelectMenu(interaction);
             }
         } catch (error) {

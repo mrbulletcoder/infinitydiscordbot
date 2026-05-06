@@ -4,7 +4,7 @@ const {
     PermissionFlagsBits
 } = require('discord.js');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 function formatUptime(ms) {
     const seconds = Math.floor(ms / 1000) % 60;
@@ -32,6 +32,9 @@ module.exports = {
         .setDescription('View detailed information about Infinity'),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         const client = interaction.client;
 
         const totalGuilds = client.guilds.cache.size;

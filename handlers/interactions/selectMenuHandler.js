@@ -16,6 +16,8 @@ const {
     handleAppealCaseSelect
 } = require('../../utils/appeals');
 
+const { handleLoggingRoleSelect } = require('./setupMenuHandler');
+
 async function handleStringSelectMenu(interaction) {
     const { customId } = interaction;
 
@@ -51,6 +53,12 @@ async function handleStringSelectMenu(interaction) {
 
     if (customId.startsWith('automod_duration_')) {
         return safeRun(interaction, `select ${customId}`, () => handleAutomodDurationSelect(interaction));
+    }
+
+    if (customId === 'setup_logging_roles') {
+        return safeRun(interaction, `select ${customId}`, () =>
+            handleLoggingRoleSelect(interaction)
+        );
     }
 }
 

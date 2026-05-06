@@ -23,7 +23,7 @@ const {
     createAppealTicket
 } = require('../../utils/appeals');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'appeal',
@@ -41,6 +41,9 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         if (!interaction.guild) {
             const eligibleGuilds = await getAppealEligibleGuildsForUser(
                 interaction.client,

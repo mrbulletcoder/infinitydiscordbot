@@ -9,7 +9,7 @@ const {
     calculateLevelFromXp
 } = require('../../utils/rank');
 
-const { safeReply } = require('../../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 module.exports = {
     name: 'leaderboard',
@@ -22,6 +22,9 @@ module.exports = {
         .setDescription('View the server rank leaderboard'),
 
     async executeSlash(interaction) {
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
+
         try {
             const rows = await getLeaderboard(interaction.guild.id, 10, 0);
 
