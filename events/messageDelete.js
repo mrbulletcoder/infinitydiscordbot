@@ -33,23 +33,29 @@ module.exports = {
                     ? '#ffaa00'
                     : '#5865f2';
 
+            const authorAccountAge = message.author?.createdTimestamp
+                ? `<t:${Math.floor(message.author.createdTimestamp / 1000)}:R>`
+                : '`Unknown`';
+
             await sendAdvancedLog(message.guild, 'message', {
                 color: deleteColor,
                 title: 'Message Deleted',
                 description: 'A message was deleted from the server.',
-                sourceChannelId: message.channel.id,
+                sourceChannelId: message.channel?.id,
                 thumbnail: message.author?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null,
                 fields: [
                     {
                         name: '👤 Author',
                         value:
-                            `${formatUser(message.author)}\n` +
-                            `Account: <t:${Math.floor(message.author.createdTimestamp / 1000)}:R>`,
+                            `${formatUser(message.author, 'Unknown User')}\n` +
+                            `Account: ${authorAccountAge}`,
                         inline: true
                     },
                     {
                         name: '📍 Channel',
-                        value: `${message.channel}\n\`${message.channel.id}\``,
+                        value: message.channel
+                            ? `${message.channel}\n\`${message.channel.id}\``
+                            : '`Unknown Channel`',
                         inline: true
                     },
                     {
