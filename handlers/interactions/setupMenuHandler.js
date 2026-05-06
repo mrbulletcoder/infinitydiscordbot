@@ -372,12 +372,12 @@ async function handleAutoLoggingSetup(interaction) {
         };
 
         const channels = {
-            message: await createOrFindChannel('infinity-message-logs'),
-            member: await createOrFindChannel('infinity-member-logs'),
-            moderation: await createOrFindChannel('infinity-moderation-logs'),
-            role: await createOrFindChannel('infinity-role-logs'),
-            channel: await createOrFindChannel('infinity-channel-logs'),
-            server: await createOrFindChannel('infinity-server-logs')
+            message: await createOrFindChannel('message-logs'),
+            member: await createOrFindChannel('member-logs'),
+            moderation: await createOrFindChannel('moderation-logs'),
+            role: await createOrFindChannel('role-logs'),
+            channel: await createOrFindChannel('channel-logs'),
+            server: await createOrFindChannel('server-logs')
         };
 
         await setLoggingEnabled(guild.id, true);
@@ -659,12 +659,12 @@ async function handleSetupButton(interaction) {
                 'Logging helps your staff track moderation actions, deleted messages, member updates, channel changes, role changes, and more.\n\n' +
                 '**Recommended channels:**\n' +
                 '```yaml\n' +
-                '#infinity-message-logs\n' +
-                '#infinity-member-logs\n' +
-                '#infinity-moderation-logs\n' +
-                '#infinity-role-logs\n' +
-                '#infinity-channel-logs\n' +
-                '#infinity-server-logs\n' +
+                '#message-logs\n' +
+                '#member-logs\n' +
+                '#moderation-logs\n' +
+                '#role-logs\n' +
+                '#channel-logs\n' +
+                '#server-logs\n' +
                 '```\n\n' +
                 'Select the roles that should be able to view the logging channels.\n\n' +
                 '⚠️ @everyone will NOT be able to see these channels.'
