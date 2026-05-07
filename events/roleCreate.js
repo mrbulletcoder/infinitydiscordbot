@@ -14,7 +14,9 @@ module.exports = {
 
     async execute(role) {
         try {
-            const audit = await fetchAuditEntry(role.guild, AuditLogEvent.RoleCreate, role.id);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const audit = await fetchAuditEntry(role.guild, AuditLogEvent.RoleCreate, role.id, 15_000);
 
             await sendAdvancedLog(role.guild, 'role', {
                 color: SUCCESS_COLOR,
@@ -32,9 +34,10 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Role Details',
+                        name: '📋 Role Info',
                         value: [
                             '```yaml',
+                            'Action: Role created',
                             `Color: ${role.hexColor}`,
                             `Position: ${role.position}`,
                             `Mentionable: ${yesNo(role.mentionable)}`,
@@ -42,11 +45,6 @@ module.exports = {
                         ].join('\n'),
                         inline: false
                     },
-                    {
-                        name: '📄 Reason',
-                        value: audit?.reason ? block(audit.reason) : '`No reason provided.`',
-                        inline: false
-                    }
                 ]
             });
         } catch (error) {

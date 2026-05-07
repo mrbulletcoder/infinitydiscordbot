@@ -103,8 +103,13 @@ function getHighestPunishment(rows) {
     return '`Custom`';
 }
 
-function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
-    const totalRules = spamRules.length + linksRules.length + capsRules.length;
+function createAutomodEmbed(guild, spamRules, linksRules, invitesRules, capsRules, filterRules) {
+    const totalRules =
+        spamRules.length +
+        linksRules.length +
+        invitesRules.length +
+        capsRules.length +
+        filterRules.length;
 
     return new EmbedBuilder()
         .setTitle('🤖 Infinity AutoMod Control Panel')
@@ -119,7 +124,7 @@ function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
                 value:
                     `**Server:** ${guild.name}\n` +
                     `**Total Rules:** \`${totalRules}\`\n` +
-                    `**Protected Categories:** \`3\``,
+                    `**Protected Categories:** \`5\``,
                 inline: false
             },
             {
@@ -139,11 +144,27 @@ function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
                 inline: true
             },
             {
+                name: '📨 Invite Protection',
+                value:
+                    `**Configured:** \`${countConfigured(invitesRules)}/5\`\n` +
+                    `**Highest Action:** ${getHighestPunishment(invitesRules)}\n\n` +
+                    `${buildRuleLines(sortRules(invitesRules))}`,
+                inline: true
+            },
+            {
                 name: '🔊 Caps Protection',
                 value:
                     `**Configured:** \`${countConfigured(capsRules)}/5\`\n` +
                     `**Highest Action:** ${getHighestPunishment(capsRules)}\n\n` +
                     `${buildRuleLines(sortRules(capsRules))}`,
+                inline: true
+            },
+            {
+                name: '🚫 Word Filter',
+                value:
+                    `**Configured:** \`${countConfigured(filterRules)}/5\`\n` +
+                    `**Highest Action:** ${getHighestPunishment(filterRules)}\n\n` +
+                    `${buildRuleLines(sortRules(filterRules))}`,
                 inline: true
             },
             {
@@ -201,7 +222,9 @@ module.exports = {
                             'Set punishments for:\n' +
                             '• Spam\n' +
                             '• Links\n' +
-                            '• Caps'
+                            '• Invites\n' +
+                            '• Caps\n' +
+                            '• Word Filter'
                     },
                     {
                         name: '💡 Suggested First Rule',
@@ -237,13 +260,17 @@ module.exports = {
 
         const spamRules = rows.filter(row => row.type === 'spam');
         const linksRules = rows.filter(row => row.type === 'links');
+        const invitesRules = rows.filter(row => row.type === 'invites');
         const capsRules = rows.filter(row => row.type === 'caps');
+        const filterRules = rows.filter(row => row.type === 'filter');
 
         const embed = createAutomodEmbed(
             interaction.guild,
             spamRules,
             linksRules,
-            capsRules
+            invitesRules,
+            capsRules,
+            filterRules
         );
 
         const row = new ActionRowBuilder().addComponents(

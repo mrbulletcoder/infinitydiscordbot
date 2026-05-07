@@ -124,11 +124,18 @@ module.exports = {
                 .setFooter({ text: 'Infinity Moderation • Case Deleted' })
                 .setTimestamp();
 
+            const targetUser = existingCase.user_id
+                ? await interaction.client.users.fetch(existingCase.user_id).catch(() => ({
+                    id: existingCase.user_id,
+                    tag: 'Unknown User'
+                }))
+                : null;
+
             await logAction({
                 client: interaction.client,
                 guild: interaction.guild,
                 action: '🗑️ Case Deleted',
-                user: existingCase.user_id ? { id: existingCase.user_id } : null,
+                user: targetUser,
                 moderator: interaction.user,
                 reason: `Case #${caseNumber} was deleted.`,
                 color: DELETE_COLOR,

@@ -66,7 +66,7 @@ module.exports = {
                             inline: true
                         },
                         {
-                            name: '📌 Timeout Details',
+                            name: '📋 Timeout Summary',
                             value: newTimeout
                                 ? [
                                     '```yaml',
@@ -114,7 +114,7 @@ module.exports = {
                             inline: true
                         },
                         {
-                            name: '📌 Nickname Change',
+                            name: '📋 Nickname Update',
                             value: [
                                 '```diff',
                                 `- Before: ${oldMember.nickname || oldMember.user.username}`,
@@ -123,11 +123,6 @@ module.exports = {
                             ].join('\n'),
                             inline: false
                         },
-                        {
-                            name: '📄 Reason',
-                            value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
-                            inline: false
-                        }
                     ]
                 });
             }
@@ -157,9 +152,10 @@ module.exports = {
                             inline: true
                         },
                         {
-                            name: '📌 Role Changes',
+                            name: '📋 Role Update Summary',
                             value: [
                                 '```yaml',
+                                'Action: Member roles updated',
                                 `Roles Added: ${added.length}`,
                                 `Roles Removed: ${removed.length}`,
                                 '```'
@@ -176,11 +172,6 @@ module.exports = {
                             value: roleLines(removed),
                             inline: false
                         }] : []),
-                        {
-                            name: '📄 Reason',
-                            value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
-                            inline: false
-                        }
                     ]
                 });
             }

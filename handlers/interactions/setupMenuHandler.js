@@ -570,6 +570,545 @@ async function handleAutoTicketSetup(interaction) {
     }
 }
 
+async function handleAutoWelcomeSetup(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    const guild = interaction.guild;
+
+    try {
+        const createOrFindCategory = async (name) => {
+            const existing = guild.channels.cache.find(channel =>
+                channel.type === ChannelType.GuildCategory &&
+                channel.name.toLowerCase() === name.toLowerCase()
+            );
+
+            if (existing) return existing;
+
+            return guild.channels.create({
+                name,
+                type: ChannelType.GuildCategory,
+                reason: 'Infinity setup wizard welcome auto setup'
+            });
+        };
+
+        const createOrFindChannel = async (name, parentId) => {
+            const existing = guild.channels.cache.find(channel =>
+                channel.type === ChannelType.GuildText &&
+                channel.name === name
+            );
+
+            if (existing) {
+                if (existing.parentId !== parentId) {
+                    await existing.setParent(parentId).catch(() => null);
+                }
+
+                return existing;
+            }
+
+            return guild.channels.create({
+                name,
+                type: ChannelType.GuildText,
+                parent: parentId,
+                reason: 'Infinity setup wizard welcome auto setup'
+            });
+        };
+
+        const informationCategory = await createOrFindCategory('Information');
+        const communityCategory = await createOrFindCategory('Community');
+
+        const welcomeChannel = await createOrFindChannel('welcome', informationCategory.id);
+        const rulesChannel = await createOrFindChannel('rules', informationCategory.id);
+        const chatChannel = await createOrFindChannel('general', communityCategory.id);
+
+        const welcomeTitle = '✨ Welcome to the Server';
+        const welcomeMessage =
+            'Welcome to **{server}**, {user}!\n\n' +
+            'We’re happy to have you here. Make sure to read the rules, introduce yourself, and enjoy the community.';
+
+        await pool.query(
+            `INSERT INTO guild_settings (
+                guild_id,
+                welcome_enabled,
+                welcome_channel,
+                welcome_title,
+                welcome_message,
+                welcome_color,
+                welcome_rules_channel,
+                welcome_chat_channel
+            )
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                welcome_enabled = 1,
+                welcome_channel = VALUES(welcome_channel),
+                welcome_title = VALUES(welcome_title),
+                welcome_message = VALUES(welcome_message),
+                welcome_color = VALUES(welcome_color),
+                welcome_rules_channel = VALUES(welcome_rules_channel),
+                welcome_chat_channel = VALUES(welcome_chat_channel)`,
+            [
+                guild.id,
+                welcomeChannel.id,
+                welcomeTitle,
+                welcomeMessage,
+                '#00bfff',
+                rulesChannel.id,
+                chatChannel.id
+            ]
+        );
+
+        const previewEmbed = new EmbedBuilder()
+            .setColor('#00bfff')
+            .setAuthor({
+                name: `${guild.name} • Welcome System`,
+                iconURL: guild.iconURL({ dynamic: true }) || undefined
+            })
+            .setTitle(welcomeTitle)
+            .setDescription(
+                `## ${welcomeMessage
+                    .replaceAll('{server}', guild.name)
+                    .replaceAll('{user}', `${interaction.user}`)}\n\n` +
+                `> New members will see a welcome message like this when they join.\n\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━\n` +
+                `📜 **Rules:** ${rulesChannel}\n` +
+                `💬 **Chat:** ${chatChannel}\n` +
+                `📍 **Welcome Channel:** ${welcomeChannel}\n` +
+                `━━━━━━━━━━━━━━━━━━━━━━`
+            )
+            .setFooter({ text: `Welcome to ${guild.name}` })
+            .setTimestamp();
+
+        await welcomeChannel.send({
+            content: `🎉 Welcome system preview for ${interaction.user}`,
+            embeds: [previewEmbed]
+        }).catch(() => null);
+
+        const successEmbed = new EmbedBuilder()
+            .setColor('#57f287')
+            .setAuthor({
+                name: 'Infinity Setup Wizard',
+                iconURL: interaction.client.user.displayAvatarURL()
+            })
+            .setTitle('✅ Welcome Setup Complete')
+            .setDescription('Infinity created and configured your welcome system.')
+            .addFields(
+                {
+                    name: '👋 Welcome Channel',
+                    value: `${welcomeChannel}`,
+                    inline: true
+                },
+                {
+                    name: '📜 Rules Channel',
+                    value: `${rulesChannel}`,
+                    inline: true
+                },
+                {
+                    name: '💬 Chat Channel',
+                    value: `${chatChannel}`,
+                    inline: true
+                },
+                {
+                    name: '📂 Information Category',
+                    value: `${informationCategory}`,
+                    inline: true
+                },
+                {
+                    name: '📂 Community Category',
+                    value: `${communityCategory}`,
+                    inline: true
+                },
+            )
+            .setFooter({ text: 'Infinity Bot • Welcome Setup ⚡' })
+            .setTimestamp();
+
+        return safeReply(interaction, {
+            embeds: [successEmbed],
+            components: [buildBackButton()]
+        });
+
+    } catch (error) {
+        console.error('Auto welcome setup error:', error);
+
+        return safeReply(interaction, {
+            content: '❌ Failed to auto setup welcome messages. Make sure I have **Manage Channels**, **Send Messages**, and **Embed Links**.',
+            components: [buildBackButton()]
+        });
+    }
+}
+
+async function handleAutomodPreset(interaction, preset) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    const guildId = interaction.guild.id;
+
+    try {
+        if (preset === 'basic') {
+            await pool.query(
+                `INSERT INTO automod_config (
+                    guild_id,
+                    spam_enabled,
+                    links_enabled,
+                    invites_enabled,
+                    caps_enabled,
+                    filter_enabled
+                )
+                VALUES (?, 1, 0, 1, 1, 0)
+                ON DUPLICATE KEY UPDATE
+                    spam_enabled = 1,
+                    links_enabled = 0,
+                    invites_enabled = 1,
+                    caps_enabled = 1,
+                    filter_enabled = 0`,
+                [guildId]
+            );
+
+            const rules = [
+                ['spam', 1, 'warn'],
+                ['spam', 2, 'timeout:300000'],
+                ['spam', 3, 'kick'],
+
+                ['invites', 1, 'warn'],
+                ['invites', 2, 'timeout:300000'],
+                ['invites', 3, 'kick'],
+
+                ['caps', 1, 'warn'],
+                ['caps', 2, 'timeout:300000'],
+                ['caps', 3, 'kick']
+            ];
+
+            for (const [type, offense, punishment] of rules) {
+                await pool.query(
+                    `INSERT INTO automod_punishments (guild_id, type, offense_number, punishment)
+                     VALUES (?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE punishment = VALUES(punishment)`,
+                    [guildId, type, offense, punishment]
+                );
+            }
+
+            const automodCache = require('../../utils/automod');
+            automodCache.invalidateAutomodCache(guildId);
+
+            const embed = new EmbedBuilder()
+                .setColor('#57f287')
+                .setAuthor({
+                    name: 'Infinity Setup Wizard',
+                    iconURL: interaction.client.user.displayAvatarURL()
+                })
+                .setTitle('✅ Basic AutoMod Protection Enabled')
+                .setDescription(
+                    'Infinity has applied a safe beginner-friendly AutoMod setup for your server.'
+                )
+                .addFields(
+                    {
+                        name: '🛡️ Enabled Protections',
+                        value:
+                            '```yaml\n' +
+                            'Spam: Enabled\n' +
+                            'Invites: Enabled\n' +
+                            'Caps: Enabled\n' +
+                            'Links: Disabled\n' +
+                            'Word Filter: Disabled\n' +
+                            '```',
+                        inline: false
+                    },
+                    {
+                        name: '⚖️ Punishment Rules',
+                        value:
+                            '```yaml\n' +
+                            'Offense #1: Warn\n' +
+                            'Offense #2: Timeout 5 minutes\n' +
+                            'Offense #3: Kick\n' +
+                            '```',
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Bot • Basic AutoMod Setup ⚡' })
+                .setTimestamp();
+
+            return safeReply(interaction, {
+                embeds: [embed],
+                components: [buildBackButton()]
+            });
+        }
+        if (preset === 'recommended') {
+            await pool.query(
+                `INSERT INTO automod_config (
+            guild_id,
+            spam_enabled,
+            links_enabled,
+            invites_enabled,
+            caps_enabled,
+            filter_enabled
+        )
+        VALUES (?, 1, 1, 1, 1, 1)
+        ON DUPLICATE KEY UPDATE
+            spam_enabled = 1,
+            links_enabled = 1,
+            invites_enabled = 1,
+            caps_enabled = 1,
+            filter_enabled = 1`,
+                [guildId]
+            );
+
+            const rules = [
+                ['spam', 1, 'warn'],
+                ['spam', 2, 'warn'],
+                ['spam', 3, 'timeout:60000'],
+                ['spam', 4, 'timeout:300000'],
+                ['spam', 5, 'kick'],
+
+                ['links', 1, 'warn'],
+                ['links', 2, 'warn'],
+                ['links', 3, 'timeout:60000'],
+                ['links', 4, 'timeout:300000'],
+                ['links', 5, 'kick'],
+
+                ['invites', 1, 'warn'],
+                ['invites', 2, 'warn'],
+                ['invites', 3, 'timeout:60000'],
+                ['invites', 4, 'timeout:300000'],
+                ['invites', 5, 'kick'],
+
+                ['caps', 1, 'warn'],
+                ['caps', 2, 'warn'],
+                ['caps', 3, 'timeout:60000'],
+                ['caps', 4, 'timeout:300000'],
+                ['caps', 5, 'kick'],
+
+                ['filter', 1, 'warn'],
+                ['filter', 2, 'warn'],
+                ['filter', 3, 'timeout:60000'],
+                ['filter', 4, 'timeout:300000'],
+                ['filter', 5, 'kick'],
+            ];
+
+            for (const [type, offense, punishment] of rules) {
+                await pool.query(
+                    `INSERT INTO automod_punishments (
+                guild_id,
+                type,
+                offense_number,
+                punishment
+            )
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                punishment = VALUES(punishment)`,
+                    [guildId, type, offense, punishment]
+                );
+            }
+
+            const starterWords = [
+                'discord.gg',
+                'free nitro',
+                '@everyone',
+                '@here'
+            ];
+
+            for (const word of starterWords) {
+                await pool.query(
+                    `INSERT IGNORE INTO automod_filtered_words (
+                guild_id,
+                word,
+                created_at
+            )
+            VALUES (?, ?, ?)`,
+                    [guildId, word, Date.now()]
+                );
+            }
+
+            const automodCache = require('../../utils/automod');
+            automodCache.invalidateAutomodCache(guildId);
+
+            const embed = new EmbedBuilder()
+                .setColor('#57f287')
+                .setAuthor({
+                    name: 'Infinity Setup Wizard',
+                    iconURL: interaction.client.user.displayAvatarURL()
+                })
+                .setTitle('✅ Recommended AutoMod Protection Enabled')
+                .setDescription(
+                    'Infinity applied the recommended AutoMod setup for your server.\n\n' +
+                    'This setup is designed for most public Discord communities.'
+                )
+                .addFields(
+                    {
+                        name: '🛡️ Enabled Protections',
+                        value:
+                            '```yaml\n' +
+                            'Spam: Enabled\n' +
+                            'Links: Enabled\n' +
+                            'Invites: Enabled\n' +
+                            'Caps: Enabled\n' +
+                            'Word Filter: Enabled\n' +
+                            '```',
+                        inline: false
+                    },
+                    {
+                        name: '⚖️ Punishment Rules',
+                        value:
+                            '```yaml\n' +
+                            'Offense #1: Warn\n' +
+                            'Offense #2: Warn\n' +
+                            'Offense #3: Timeout 1 minute\n' +
+                            'Offense #4: Timeout 5 minutes\n' +
+                            'Offense #5: Kick\n' +
+                            '```',
+                        inline: false
+                    },
+                    {
+                        name: '🚫 Starter Word Filter',
+                        value:
+                            '```yaml\n' +
+                            'discord.gg\n' +
+                            'free nitro\n' +
+                            '@everyone\n' +
+                            '@here\n' +
+                            '```',
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Bot • Recommended AutoMod Setup ⚡' })
+                .setTimestamp();
+
+            return safeReply(interaction, {
+                embeds: [embed],
+                components: [buildBackButton()]
+            });
+        }
+        if (preset === 'aggressive') {
+            await pool.query(
+                `INSERT INTO automod_config (
+            guild_id,
+            spam_enabled,
+            links_enabled,
+            invites_enabled,
+            caps_enabled,
+            filter_enabled
+        )
+        VALUES (?, 1, 1, 1, 1, 1)
+        ON DUPLICATE KEY UPDATE
+            spam_enabled = 1,
+            links_enabled = 1,
+            invites_enabled = 1,
+            caps_enabled = 1,
+            filter_enabled = 1`,
+                [guildId]
+            );
+
+            const types = ['spam', 'links', 'invites', 'caps', 'filter'];
+
+            const rules = types.flatMap(type => [
+                [type, 1, 'warn'],
+                [type, 2, 'timeout:300000'],
+                [type, 3, 'timeout:1800000'],
+                [type, 4, 'kick'],
+                [type, 5, 'kick']
+            ]);
+
+            for (const [type, offense, punishment] of rules) {
+                await pool.query(
+                    `INSERT INTO automod_punishments (
+                guild_id,
+                type,
+                offense_number,
+                punishment
+            )
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                punishment = VALUES(punishment)`,
+                    [guildId, type, offense, punishment]
+                );
+            }
+
+            const starterWords = [
+                'discord.gg',
+                'free nitro',
+                '@everyone',
+                '@here'
+            ];
+
+            for (const word of starterWords) {
+                await pool.query(
+                    `INSERT IGNORE INTO automod_filtered_words (
+                guild_id,
+                word,
+                created_at
+            )
+            VALUES (?, ?, ?)`,
+                    [guildId, word, Date.now()]
+                );
+            }
+
+            const automodCache = require('../../utils/automod');
+            automodCache.invalidateAutomodCache(guildId);
+
+            const embed = new EmbedBuilder()
+                .setColor('#ff4d4d')
+                .setAuthor({
+                    name: 'Infinity Setup Wizard',
+                    iconURL: interaction.client.user.displayAvatarURL()
+                })
+                .setTitle('✅ Aggressive AutoMod Protection Enabled')
+                .setDescription(
+                    'Infinity applied a stricter AutoMod setup for your server.\n\n' +
+                    'This preset is best for large public servers, raids, or high-risk communities.'
+                )
+                .addFields(
+                    {
+                        name: '🛡️ Enabled Protections',
+                        value:
+                            '```yaml\n' +
+                            'Spam: Enabled\n' +
+                            'Links: Enabled\n' +
+                            'Invites: Enabled\n' +
+                            'Caps: Enabled\n' +
+                            'Word Filter: Enabled\n' +
+                            '```',
+                        inline: false
+                    },
+                    {
+                        name: '⚖️ Punishment Rules',
+                        value:
+                            '```yaml\n' +
+                            'Offense #1: Warn\n' +
+                            'Offense #2: Timeout 5 minutes\n' +
+                            'Offense #3: Timeout 30 minutes\n' +
+                            'Offense #4: Kick\n' +
+                            'Offense #5: Kick\n' +
+                            '```',
+                        inline: false
+                    },
+                    {
+                        name: '🚫 Starter Word Filter',
+                        value:
+                            '```yaml\n' +
+                            'discord.gg\n' +
+                            'free nitro\n' +
+                            '@everyone\n' +
+                            '@here\n' +
+                            '```',
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Bot • Aggressive AutoMod Setup ⚡' })
+                .setTimestamp();
+
+            return safeReply(interaction, {
+                embeds: [embed],
+                components: [buildBackButton()]
+            });
+        }
+    } catch (error) {
+        console.error('AutoMod preset setup error:', error);
+
+        return safeReply(interaction, {
+            content: '❌ Failed to apply AutoMod preset.',
+            components: [buildBackButton()]
+        });
+    }
+}
+
 async function handleSetupButton(interaction) {
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({
@@ -591,6 +1130,50 @@ async function handleSetupButton(interaction) {
 
     if (interaction.customId === 'setup_tickets_auto') {
         return handleAutoTicketSetup(interaction);
+    }
+
+    if (interaction.customId === 'setup_automod_advanced') {
+        const embed = new EmbedBuilder()
+            .setColor('#00bfff')
+            .setAuthor({
+                name: 'Infinity Setup Wizard',
+                iconURL: interaction.client.user.displayAvatarURL()
+            })
+            .setTitle('⚙️ AutoMod Advanced Configuration')
+            .setDescription(
+                'Use these commands to fine tune AutoMod manually.\n\n' +
+                '```yaml\n' +
+                '/automod: enable or disable protection types\n' +
+                '/automod-rules: set punishments by offense number\n' +
+                '/automod-filter: add, remove, or view blocked words\n' +
+                '/automod-view: view your full AutoMod setup\n' +
+                '/automod-whitelist: bypass users, roles, or channels\n' +
+                '```\n\n' +
+                'For most servers, **Recommended Protection** is the best starting point.'
+            )
+            .setFooter({ text: 'Infinity Bot • AutoMod Advanced Setup ⚡' })
+            .setTimestamp();
+
+        return interaction.update({
+            embeds: [embed],
+            components: [buildBackButton()]
+        }).catch(() => null);
+    }
+
+    if (interaction.customId === 'setup_automod_basic') {
+        return handleAutomodPreset(interaction, 'basic');
+    }
+
+    if (interaction.customId === 'setup_automod_recommended') {
+        return handleAutomodPreset(interaction, 'recommended');
+    }
+
+    if (interaction.customId === 'setup_automod_aggressive') {
+        return handleAutomodPreset(interaction, 'aggressive');
+    }
+
+    if (interaction.customId === 'setup_welcome_auto') {
+        return handleAutoWelcomeSetup(interaction);
     }
 
     const type = interaction.customId.replace('setup_', '');
@@ -688,6 +1271,224 @@ async function handleSetupButton(interaction) {
         }).catch(() => null);
     }
 
+    if (type === 'welcome') {
+        const embed = new EmbedBuilder()
+            .setColor('#00bfff')
+            .setAuthor({
+                name: 'Infinity Setup Wizard',
+                iconURL: interaction.client.user.displayAvatarURL()
+            })
+            .setTitle('👋 Welcome Setup')
+            .setDescription(
+                'Welcome messages help new members feel comfortable when they join your server.\n\n' +
+                '**Auto Setup will create or use:**\n' +
+                '```yaml\n' +
+                '#welcome\n' +
+                '#rules\n' +
+                '#general\n' +
+                '```\n\n' +
+                'Infinity will enable welcome messages and send a preview in the welcome channel.'
+            )
+            .setFooter({ text: 'Infinity Bot • Welcome Setup ⚡' })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('setup_welcome_auto')
+                .setLabel('Auto Setup')
+                .setEmoji('⚡')
+                .setStyle(ButtonStyle.Success),
+
+            new ButtonBuilder()
+                .setCustomId('setup_back')
+                .setLabel('Back')
+                .setEmoji('⬅️')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        return interaction.update({
+            embeds: [embed],
+            components: [row]
+        }).catch(() => null);
+    }
+
+    if (type === 'automod') {
+        const [[config]] = await pool.query(
+            `SELECT
+            spam_enabled,
+            links_enabled,
+            invites_enabled,
+            caps_enabled,
+            filter_enabled
+         FROM automod_config
+         WHERE guild_id = ?`,
+            [interaction.guild.id]
+        );
+
+        const [ruleRows] = await pool.query(
+            `SELECT type, offense_number, punishment
+         FROM automod_punishments
+         WHERE guild_id = ?`,
+            [interaction.guild.id]
+        ).catch(() => [[]]);
+
+        const automodConfig = config || {};
+
+        const protections = [
+            ['Spam', automodConfig.spam_enabled],
+            ['Links', automodConfig.links_enabled],
+            ['Invites', automodConfig.invites_enabled],
+            ['Caps', automodConfig.caps_enabled],
+            ['Word Filter', automodConfig.filter_enabled]
+        ];
+
+        const enabledCount = protections.filter(([, enabled]) => Number(enabled)).length;
+
+        const protectionLevel =
+            enabledCount === 5
+                ? '🟢 Strong'
+                : enabledCount >= 3
+                    ? '🟡 Moderate'
+                    : enabledCount >= 1
+                        ? '🟠 Basic'
+                        : '🔴 Not Configured';
+
+        const enabledSystems = protections
+            .map(([name, enabled]) => `${name}: ${Number(enabled) ? 'Enabled' : 'Disabled'}`)
+            .join('\n');
+
+        const totalRules = ruleRows.length;
+
+        let currentPreset = '⚙️ Custom / Manual';
+
+        const hasBasicShape =
+            Number(automodConfig.spam_enabled) &&
+            !Number(automodConfig.links_enabled) &&
+            Number(automodConfig.invites_enabled) &&
+            Number(automodConfig.caps_enabled) &&
+            !Number(automodConfig.filter_enabled);
+
+        const hasRecommendedShape =
+            enabledCount === 5 &&
+            ruleRows.some(rule => rule.punishment === 'timeout:60000') &&
+            ruleRows.some(rule => rule.punishment === 'timeout:300000') &&
+            !ruleRows.some(rule => rule.punishment === 'timeout:1800000');
+
+        const hasAggressiveShape =
+            enabledCount === 5 &&
+            ruleRows.some(rule => rule.punishment === 'timeout:1800000');
+
+        if (hasAggressiveShape) {
+            currentPreset = '🔴 Aggressive Protection';
+        } else if (hasRecommendedShape) {
+            currentPreset = '🟡 Recommended Protection';
+        } else if (hasBasicShape) {
+            currentPreset = '🟢 Basic Protection';
+        } else if (enabledCount === 0) {
+            currentPreset = '❌ Not Configured';
+        }
+
+        const recommendation =
+            enabledCount === 0
+                ? 'Start with **Recommended Protection**. It is the best option for most servers.'
+                : enabledCount < 3
+                    ? 'Your server has light protection. **Recommended Protection** would be safer.'
+                    : enabledCount < 5
+                        ? 'Your setup is decent, but enabling all protections gives better coverage.'
+                        : 'Your AutoMod setup looks strong. Use **Advanced Config** if you want to fine tune it.';
+
+        const embed = new EmbedBuilder()
+            .setColor(
+                enabledCount === 5
+                    ? '#57f287'
+                    : enabledCount >= 3
+                        ? '#ffaa00'
+                        : '#ff4d4d'
+            )
+            .setAuthor({
+                name: 'Infinity Setup Wizard',
+                iconURL: interaction.client.user.displayAvatarURL()
+            })
+            .setTitle('🤖 AutoMod Setup')
+            .setDescription(
+                'AutoMod protects your server from spam, invite advertising, unsafe links, caps abuse, and filtered words.'
+            )
+            .addFields(
+                {
+                    name: '🛡️ Current Protection',
+                    value:
+                        `**Protection Level:** ${protectionLevel}\n` +
+                        `**Current Preset:** ${currentPreset}\n` +
+                        `**Enabled Protections:** \`${enabledCount}/5\`\n` +
+                        `**Rules Configured:** \`${totalRules}\``,
+                    inline: false
+                },
+                {
+                    name: '⚙️ Enabled Systems',
+                    value:
+                        '```yaml\n' +
+                        enabledSystems +
+                        '\n```',
+                    inline: false
+                },
+                {
+                    name: '⚡ Protection Presets',
+                    value:
+                        '🟢 **Basic** — Small/private servers\n' +
+                        '🟡 **Recommended** — Best for most communities\n' +
+                        '🔴 **Aggressive** — Large or high-risk servers\n' +
+                        '⚙️ **Advanced Config** — Manual fine tuning',
+                    inline: false
+                },
+                {
+                    name: '💡 Recommendation',
+                    value: recommendation,
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Infinity Bot • AutoMod Setup ⚡' })
+            .setTimestamp();
+
+        const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('setup_automod_basic')
+                .setLabel('Basic')
+                .setEmoji('🟢')
+                .setStyle(ButtonStyle.Success),
+
+            new ButtonBuilder()
+                .setCustomId('setup_automod_recommended')
+                .setLabel('Recommended')
+                .setEmoji('🟡')
+                .setStyle(ButtonStyle.Primary),
+
+            new ButtonBuilder()
+                .setCustomId('setup_automod_aggressive')
+                .setLabel('Aggressive')
+                .setEmoji('🔴')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('setup_automod_advanced')
+                .setLabel('Advanced Config')
+                .setEmoji('⚙️')
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId('setup_back')
+                .setLabel('Back')
+                .setEmoji('⬅️')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        return interaction.update({
+            embeds: [embed],
+            components: [row1, row2]
+        }).catch(() => null);
+    }
+
     const pages = {
         full: {
             title: '🎯 Full Setup',
@@ -773,5 +1574,7 @@ module.exports = {
     buildSetupMainComponents,
     handleSetupButton,
     handleAutoLoggingSetup,
+    handleAutoWelcomeSetup,
+    handleAutomodPreset,
     handleLoggingRoleSelect
 };

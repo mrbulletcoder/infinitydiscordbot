@@ -42,11 +42,12 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Action Details',
+                        name: '📋 Moderation Summary',
                         value: [
                             '```yaml',
-                            `Action: ${title}`,
-                            'Source: Infinity Moderation',
+                            'Action: Member unbanned',
+                            `Handled By: ${executor?.tag || 'Unknown Moderator'}`,
+                            'Case Created: No',
                             '```'
                         ].join('\n'),
                         inline: false

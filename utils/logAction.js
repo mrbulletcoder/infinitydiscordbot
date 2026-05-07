@@ -33,6 +33,7 @@ module.exports = async function logAction({
     reason,
     color,
     extra,
+    targetChannel = null,
     createCase = true,
     existingCaseNumber = null
 }) {
@@ -129,12 +130,14 @@ module.exports = async function logAction({
         title: caseNumber
             ? `${action || 'Moderation Action'} • Case #${caseNumber}`
             : `${action || 'Moderation Action'}`,
-        description: 'A moderation action was recorded by Infinity.',
+        description: 'A moderation action was logged for this server.',
         thumbnail: targetUser?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null,
         fields: [
             {
-                name: '👤 Target',
-                value: formatUser(targetUser, 'No target user'),
+                name: targetChannel ? '📍 Channel' : '👤 Target',
+                value: targetChannel
+                    ? `${targetChannel}\n\`${targetChannel.id}\``
+                    : formatUser(targetUser, 'No target user'),
                 inline: true
             },
             {
@@ -145,15 +148,15 @@ module.exports = async function logAction({
             {
                 name: '📁 Case',
                 value: caseNumber ? `\`#${caseNumber}\`` : '`No case created`',
-                inline: true
+                inline: false
             },
             {
-                name: '📌 Action Details',
+                name: '📋 Moderation Summary',
                 value: [
                     '```yaml',
                     `Action: ${actionName}`,
                     `Case: ${caseNumber ? `#${caseNumber}` : 'No case created'}`,
-                    `Source: ${modUser?.bot ? 'Infinity AutoMod / Bot Action' : 'Moderator Action'}`,
+                    `Handled By: ${modUser?.bot ? 'Infinity AutoMod' : getUserTag(modUser, 'Unknown Moderator')}`,
                     '```'
                 ].join('\n'),
                 inline: false

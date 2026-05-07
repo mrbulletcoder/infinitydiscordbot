@@ -24,7 +24,9 @@ module.exports = {
         try {
             if (!channel.guild) return;
 
-            const audit = await fetchAuditEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const audit = await fetchAuditEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id, 15_000);
 
             await sendAdvancedLog(channel.guild, 'channel', {
                 color: DANGER_COLOR,
@@ -42,9 +44,10 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Channel Details',
+                        name: '📋 Channel Info',
                         value: [
                             '```yaml',
+                            'Action: Channel deleted',
                             `Type: ${channelTypeName(channel)}`,
                             `Category: ${channel.parent?.name || 'None'}`,
                             `Position: ${channel.position ?? 'Unknown'}`,

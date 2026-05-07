@@ -227,6 +227,7 @@ async function runClear({ client, guild, channel, moderator, filters, reply, pub
             guild,
             action: '🧹 Messages Cleared',
             user: filters.user || null,
+            targetChannel: channel,
             moderator,
             reason: `Cleared ${deleted.size} message(s)`,
             color: CLEAR_COLOR,

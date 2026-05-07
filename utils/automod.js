@@ -10,6 +10,7 @@ const CACHE_TIME = 60 * 1000;
 const userMessages = new Map();
 const configCache = new Map();
 const whitelistCache = new Map();
+const filteredWordsCache = new Map();
 
 function reply(interaction, payload, ephemeral = true) {
     return safeReply(interaction, payload, ephemeral);
@@ -22,6 +23,7 @@ function isCacheValid(cacheItem) {
 function invalidateAutomodCache(guildId) {
     configCache.delete(guildId);
     whitelistCache.delete(guildId);
+    filteredWordsCache.delete(guildId);
 }
 
 async function ensureAutomodConfig(guildId) {
@@ -40,16 +42,18 @@ async function getAutomodConfig(guildId) {
     await ensureAutomodConfig(guildId);
 
     const [rows] = await pool.query(
-        `SELECT spam_enabled, links_enabled, caps_enabled
-         FROM automod_config
-         WHERE guild_id = ?`,
+        `SELECT spam_enabled, links_enabled, invites_enabled, caps_enabled, filter_enabled
+        FROM automod_config
+        WHERE guild_id = ?`,
         [guildId]
     );
 
     const data = rows[0] || {
         spam_enabled: 1,
         links_enabled: 1,
-        caps_enabled: 1
+        invites_enabled: 1,
+        caps_enabled: 1,
+        filter_enabled: 1
     };
 
     configCache.set(guildId, {
@@ -86,6 +90,27 @@ async function getWhitelist(guildId) {
     };
 
     whitelistCache.set(guildId, {
+        data,
+        createdAt: Date.now()
+    });
+
+    return data;
+}
+
+async function getFilteredWords(guildId) {
+    const cached = filteredWordsCache.get(guildId);
+    if (isCacheValid(cached)) return cached.data;
+
+    const [rows] = await pool.query(
+        `SELECT word
+         FROM automod_filtered_words
+         WHERE guild_id = ?`,
+        [guildId]
+    );
+
+    const data = rows.map(row => row.word.toLowerCase());
+
+    filteredWordsCache.set(guildId, {
         data,
         createdAt: Date.now()
     });
@@ -156,6 +181,25 @@ async function automod(message) {
 
         const content = message.content;
 
+        const lowerContent = content.toLowerCase();
+
+        const inviteRegex = /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[^\s]+/i;
+
+        if (config.filter_enabled) {
+            const filteredWords = await getFilteredWords(guildId);
+
+            const matchedWord = filteredWords.find(word => {
+                const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+                return regex.test(lowerContent);
+            });
+
+            if (matchedWord) {
+                await punish(message, '🚫 Blocked Word Detected', 'filter');
+                return;
+            }
+        }
+
         if (config.spam_enabled) {
             const now = Date.now();
 
@@ -175,8 +219,13 @@ async function automod(message) {
             }
         }
 
+        if (config.invites_enabled && inviteRegex.test(lowerContent)) {
+            await punish(message, '📨 Discord Invite Detected', 'invites');
+            return;
+        }
+
         if (config.links_enabled && /(https?:\/\/[^\s]+)/gi.test(content)) {
-            await punish(message, '🔗 Unauthorized Link', 'links');
+            await punish(message, '🔗 Unauthorized Link Detected', 'links');
             return;
         }
 

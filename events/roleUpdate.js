@@ -19,16 +19,40 @@ module.exports = {
         try {
             const changes = [];
 
-            if (oldRole.name !== newRole.name) addChange(changes, 'Name', inlineCode(oldRole.name), inlineCode(newRole.name));
-            if (oldRole.hexColor !== newRole.hexColor) addChange(changes, 'Color', inlineCode(oldRole.hexColor), inlineCode(newRole.hexColor));
-            if (oldRole.hoist !== newRole.hoist) addChange(changes, 'Display Separately', yesNo(oldRole.hoist), yesNo(newRole.hoist));
-            if (oldRole.mentionable !== newRole.mentionable) addChange(changes, 'Mentionable', yesNo(oldRole.mentionable), yesNo(newRole.mentionable));
-            if (oldRole.position !== newRole.position) addChange(changes, 'Position', inlineCode(oldRole.position), inlineCode(newRole.position));
-            if (oldRole.permissions.bitfield !== newRole.permissions.bitfield) changes.push('**Permissions:** permissions were updated');
+            if (oldRole.name !== newRole.name) {
+                addChange(changes, 'Name', inlineCode(oldRole.name), inlineCode(newRole.name));
+            }
+
+            if (oldRole.hexColor !== newRole.hexColor) {
+                addChange(changes, 'Color', inlineCode(oldRole.hexColor), inlineCode(newRole.hexColor));
+            }
+
+            if (oldRole.hoist !== newRole.hoist) {
+                addChange(changes, 'Display Separately', yesNo(oldRole.hoist), yesNo(newRole.hoist));
+            }
+
+            if (oldRole.mentionable !== newRole.mentionable) {
+                addChange(changes, 'Mentionable', yesNo(oldRole.mentionable), yesNo(newRole.mentionable));
+            }
+
+            // Ignore role position changes.
+            // Discord fires multiple noisy roleUpdate events when roles are dragged,
+            // and audit logs are unreliable for these updates.
+
+            if (oldRole.permissions.bitfield !== newRole.permissions.bitfield) {
+                changes.push('**Permissions:** permissions were updated');
+            }
 
             if (!changes.length) return;
 
-            const audit = await fetchAuditEntry(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const audit = await fetchAuditEntry(
+                newRole.guild,
+                AuditLogEvent.RoleUpdate,
+                newRole.id,
+                15_000
+            );
 
             await sendAdvancedLog(newRole.guild, 'role', {
                 color: EDIT_COLOR,
@@ -46,7 +70,7 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Changes',
+                        name: '📋 What Changed',
                         value: [
                             '```diff',
                             ...changes.map(c => `+ ${c}`),

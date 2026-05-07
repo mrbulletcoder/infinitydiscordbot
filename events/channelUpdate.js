@@ -54,7 +54,9 @@ module.exports = {
 
             if (!changes.length) return;
 
-            const audit = await fetchAuditEntry(newChannel.guild, AuditLogEvent.ChannelUpdate, newChannel.id);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const audit = await fetchAuditEntry(newChannel.guild, AuditLogEvent.ChannelUpdate, newChannel.id, 15_000);
 
             await sendAdvancedLog(newChannel.guild, 'channel', {
                 color: EDIT_COLOR,
@@ -72,7 +74,7 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Changes',
+                        name: '📋 What Changed',
                         value: [
                             '```diff',
                             ...changes.map(c => `+ ${c}`),

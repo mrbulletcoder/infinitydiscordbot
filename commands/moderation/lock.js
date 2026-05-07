@@ -67,6 +67,7 @@ module.exports = {
                 guild: interaction.guild,
                 action: '🔒 Channel Locked',
                 user: null,
+                targetChannel: channel,
                 moderator: interaction.user,
                 reason,
                 color: LOCK_COLOR,

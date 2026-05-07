@@ -18,7 +18,9 @@ module.exports = {
             const audit = await fetchAuditEntry(member.guild, AuditLogEvent.MemberKick, member.id, 10_000);
             const wasKicked = Boolean(audit?.executor);
             const joined = member.joinedTimestamp ? unix(member.joinedTimestamp) : null;
-            const accountCreated = unix(member.user.createdTimestamp);
+            const accountCreated = member.user?.createdTimestamp
+                ? unix(member.user.createdTimestamp)
+                : null;
 
             await sendAdvancedLog(member.guild, 'member', {
                 color: wasKicked ? DANGER_COLOR : '#99aab5',
@@ -39,10 +41,10 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Member Details',
+                        name: '📋 Member Summary',
                         value: [
                             '```yaml',
-                            `Action: ${wasKicked ? 'Member Kicked' : 'Member Left'}`,
+                            `Action: ${wasKicked ? 'Member kicked' : 'Member left'}`,
                             `Time In Server: ${member.joinedTimestamp ? formatDuration(Date.now() - member.joinedTimestamp) : 'Unknown'}`,
                             '```'
                         ].join('\n'),
@@ -52,14 +54,14 @@ module.exports = {
                         name: '📅 Join / Account Info',
                         value:
                             `**Joined Server:** ${joined ? `<t:${joined}:F>\n<t:${joined}:R>` : 'Unknown'}\n` +
-                            `**Account Created:** <t:${accountCreated}:F>\n<t:${accountCreated}:R>`,
+                            `**Account Created:** ${accountCreated ? `<t:${accountCreated}:F>\n<t:${accountCreated}:R>` : '`Unknown`'}`,
                         inline: false
                     },
-                    {
+                    ...(wasKicked ? [{
                         name: '📄 Reason',
                         value: audit?.reason ? `> ${audit.reason}` : '`No reason provided.`',
                         inline: false
-                    }
+                    }] : [])
                 ]
             });
         } catch (error) {

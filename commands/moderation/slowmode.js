@@ -86,6 +86,7 @@ module.exports = {
                 guild: interaction.guild,
                 action: seconds === 0 ? '🐢 Slowmode Disabled' : '🐢 Slowmode Updated',
                 user: null,
+                targetChannel: channel,
                 moderator: interaction.user,
                 reason,
                 color: SLOWMODE_COLOR,

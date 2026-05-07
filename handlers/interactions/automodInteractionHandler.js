@@ -69,8 +69,13 @@ async function getAutomodRuleRows(guildId) {
     return rows;
 }
 
-function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
-    const totalRules = spamRules.length + linksRules.length + capsRules.length;
+function createAutomodEmbed(guild, spamRules, linksRules, invitesRules, capsRules, filterRules) {
+    const totalRules =
+        spamRules.length +
+        linksRules.length +
+        invitesRules.length +
+        capsRules.length +
+        filterRules.length;
 
     return new EmbedBuilder()
         .setTitle('🤖 Infinity AutoMod Control Panel')
@@ -79,7 +84,7 @@ function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
         .addFields(
             {
                 name: '📊 Configuration Overview',
-                value: `**Server:** ${guild.name}\n**Total Rules:** \`${totalRules}\`\n**Protected Categories:** \`3\``,
+                value: `**Server:** ${guild.name}\n**Total Rules:** \`${totalRules}\`\n**Protected Categories:** \`5\``,
                 inline: false
             },
             {
@@ -93,8 +98,18 @@ function createAutomodEmbed(guild, spamRules, linksRules, capsRules) {
                 inline: true
             },
             {
+                name: '📨 Invite Protection',
+                value: `**Configured:** \`${countConfigured(invitesRules)}/5\`\n**Highest Action:** ${getHighestPunishment(invitesRules)}\n\n${buildRuleLines(sortRules(invitesRules))}`,
+                inline: true
+            },
+            {
                 name: '🔊 Caps Protection',
                 value: `**Configured:** \`${countConfigured(capsRules)}/5\`\n**Highest Action:** ${getHighestPunishment(capsRules)}\n\n${buildRuleLines(sortRules(capsRules))}`,
+                inline: true
+            },
+            {
+                name: '🚫 Word Filter',
+                value: `**Configured:** \`${countConfigured(filterRules)}/5\`\n**Highest Action:** ${getHighestPunishment(filterRules)}\n\n${buildRuleLines(sortRules(filterRules))}`,
                 inline: true
             },
             {
@@ -150,8 +165,17 @@ async function applyRule(interaction, type, offense, action, duration, mode) {
     const rows = await getAutomodRuleRows(guildId);
     const spamRules = rows.filter(row => row.type === 'spam');
     const linksRules = rows.filter(row => row.type === 'links');
+    const invitesRules = rows.filter(row => row.type === 'invites');
     const capsRules = rows.filter(row => row.type === 'caps');
-    const embed = createAutomodEmbed(interaction.guild, spamRules, linksRules, capsRules);
+    const filterRules = rows.filter(row => row.type === 'filter');
+    const embed = createAutomodEmbed(
+        interaction.guild,
+        spamRules,
+        linksRules,
+        invitesRules,
+        capsRules,
+        filterRules
+    );
 
     return interaction.editReply({
         content: `✅ Rule ${mode === 'delete' ? 'deleted' : 'updated'} successfully.`,
@@ -169,7 +193,9 @@ async function handleAutomodModeButton(interaction) {
         .addOptions([
             { label: 'Spam Protection', value: 'spam', emoji: '🚫', description: 'Configure spam offense punishments' },
             { label: 'Link Protection', value: 'links', emoji: '🔗', description: 'Configure link offense punishments' },
-            { label: 'Caps Protection', value: 'caps', emoji: '🔊', description: 'Configure caps offense punishments' }
+            { label: 'Invite Protection', value: 'invites', emoji: '📨', description: 'Block Discord invite links' },
+            { label: 'Caps Protection', value: 'caps', emoji: '🔊', description: 'Configure caps offense punishments' },          
+            { label: 'Word Filter', value: 'filter', emoji: '🚫', description: 'Block filtered words and phrases' },
         ]);
 
     return interaction.reply({

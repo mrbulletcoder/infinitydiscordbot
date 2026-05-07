@@ -3,7 +3,6 @@ const {
     DANGER_COLOR,
     block,
     fetchAuditEntry,
-    formatChannel,
     formatUser,
     sendAdvancedLog
 } = require('../utils/advancedLogger');
@@ -13,18 +12,33 @@ module.exports = {
 
     async execute(message) {
         try {
-            if (message.partial) message = await message.fetch().catch(() => message);
+            if (message.partial) {
+                message = await message.fetch().catch(() => message);
+            }
+
             if (!message.guild || message.author?.bot) return;
 
-            const automodDelete = message.client.recentAutomodDeletes?.get(message.id);
+            const automodDelete =
+                message.client.recentAutomodDeletes?.get(message.id);
 
             const audit = automodDelete
                 ? null
-                : await fetchAuditEntry(message.guild, AuditLogEvent.MessageDelete, message.author?.id, 7_000);
+                : await fetchAuditEntry(
+                    message.guild,
+                    AuditLogEvent.MessageDelete,
+                    message.author?.id,
+                    7_000
+                );
 
-            const deletedBy = automodDelete?.executor || audit?.executor || null;
+            const deletedBy =
+                automodDelete?.executor ||
+                audit?.executor ||
+                null;
+
             const attachmentText = message.attachments?.size
-                ? message.attachments.map(attachment => `[${attachment.name || 'Attachment'}](${attachment.url})`).join('\n')
+                ? message.attachments
+                    .map(a => `[${a.name || 'Attachment'}](${a.url})`)
+                    .join('\n')
                 : 'None';
 
             const deleteColor = automodDelete
@@ -42,7 +56,12 @@ module.exports = {
                 title: 'Message Deleted',
                 description: 'A message was deleted from the server.',
                 sourceChannelId: message.channel?.id,
-                thumbnail: message.author?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null,
+                thumbnail:
+                    message.author?.displayAvatarURL?.({
+                        dynamic: true,
+                        size: 256
+                    }) || null,
+
                 fields: [
                     {
                         name: '👤 Author',
@@ -51,6 +70,7 @@ module.exports = {
                             `Account: ${authorAccountAge}`,
                         inline: true
                     },
+
                     {
                         name: '📍 Channel',
                         value: message.channel
@@ -58,48 +78,56 @@ module.exports = {
                             : '`Unknown Channel`',
                         inline: true
                     },
+
                     {
                         name: '🛡️ Deleted By',
                         value: automodDelete
                             ? `🤖 ${formatUser(deletedBy)}\n\`Infinity AutoMod\``
                             : audit?.executor
                                 ? `🛡️ ${formatUser(deletedBy)}\n\`Moderator Action\``
-                                : `👤 Unknown / Self Deleted`,
-                        inline: true
+                                : `👤 ${formatUser(message.author, 'Unknown User')}\n• Self Deleted`,
+                        inline: false
                     },
+
                     {
-                        name: '📌 Delete Details',
+                        name: '📋 Delete Summary',
                         value:
                             automodDelete
                                 ? [
                                     '```yaml',
-                                    'Type: AutoMod Action',
-                                    `Reason: ${automodDelete.reason}`,
-                                    `Source: Infinity`,
+                                    'Action: AutoMod deleted message',
+                                    `Reason: ${automodDelete.reason || 'AutoMod rule triggered'}`,
+                                    'Handled By: Infinity AutoMod',
                                     '```'
                                 ].join('\n')
                                 : audit?.executor
                                     ? [
                                         '```yaml',
-                                        'Type: Moderator Action',
-                                        `Moderator: ${audit.executor.tag}`,
+                                        'Action: Message deleted by moderator',
+                                        `Deleted By: ${audit.executor.tag}`,
                                         '```'
                                     ].join('\n')
                                     : [
                                         '```yaml',
-                                        'Type: User Deleted Message',
-                                        'Source: Self Delete / Unknown',
+                                        'Action: User deleted their own message',
+                                        `Deleted By: ${message.author?.tag || 'Unknown User'}`,
                                         '```'
                                     ].join('\n'),
+
                         inline: false
                     },
+
                     {
                         name: '🧾 Message Info',
-                        value:
-                            `**Message ID:** \`${message.id}\`\n` +
-                            `**Attachments:** ${attachmentText}`,
+                        value: [
+                            '```yaml',
+                            `Message ID: ${message.id}`,
+                            `Attachments: ${attachmentText}`,
+                            '```'
+                        ].join('\n'),
                         inline: false
                     },
+
                     {
                         name: '📝 Deleted Content',
                         value: message.content

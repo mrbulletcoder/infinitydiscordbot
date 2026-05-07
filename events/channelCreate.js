@@ -25,7 +25,9 @@ module.exports = {
         try {
             if (!channel.guild) return;
 
-            const audit = await fetchAuditEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            const audit = await fetchAuditEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id, 15_000);
 
             await sendAdvancedLog(channel.guild, 'channel', {
                 color: SUCCESS_COLOR,
@@ -43,9 +45,10 @@ module.exports = {
                         inline: true
                     },
                     {
-                        name: '📌 Channel Details',
+                        name: '📋 Channel Info',
                         value: [
                             '```yaml',
+                            'Action: Channel created',
                             `Type: ${channelTypeName(channel)}`,
                             `Category: ${channel.parent?.name || 'None'}`,
                             `Position: ${channel.position ?? 'Unknown'}`,

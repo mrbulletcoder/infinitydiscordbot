@@ -13,14 +13,6 @@ module.exports = {
         const rotatingActivities = [
             { name: '/help • View all commands', type: ActivityType.Listening },
             { name: '/invite • Add Infinity to your server', type: ActivityType.Watching },
-            { name: '/report • Report a member', type: ActivityType.Watching },
-            { name: '/daily • Claim your reward', type: ActivityType.Playing },
-            { name: '/balance • Check your coins', type: ActivityType.Playing },
-            { name: '/work • Earn coins', type: ActivityType.Playing },
-            { name: '/beg • Try your luck', type: ActivityType.Playing },
-            { name: 'AutoMod protecting chats', type: ActivityType.Watching },
-            { name: 'reaction roles & self roles', type: ActivityType.Watching },
-            { name: 'safe and easy server experience', type: ActivityType.Watching }
         ];
 
         // ✅ Giveaway scheduler

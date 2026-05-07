@@ -43,7 +43,9 @@ module.exports = {
                 .addChoices(
                     { name: 'spam', value: 'spam' },
                     { name: 'links', value: 'links' },
+                    { name: 'invites', value: 'invites' },
                     { name: 'caps', value: 'caps' },
+                    { name: 'filter', value: 'filter' },
                     { name: 'all', value: 'all' }
                 )
         )
@@ -79,7 +81,7 @@ module.exports = {
         const action = interaction.options.getString('action', true);
         const duration = interaction.options.getInteger('duration');
 
-        const types = type === 'all' ? ['spam', 'links', 'caps'] : [type];
+        const types = type === 'all' ? ['spam', 'links', 'invites', 'caps', 'filter'] : [type];
 
         if (action === 'timeout' && !duration) {
             return safeReply(interaction, {

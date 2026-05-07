@@ -102,11 +102,18 @@ module.exports = {
             .setFooter({ text: 'Infinity Moderation • Case Reason Edited' })
             .setTimestamp();
 
+        const targetUser = oldCase.user_id
+            ? await interaction.client.users.fetch(oldCase.user_id).catch(() => ({
+                id: oldCase.user_id,
+                tag: 'Unknown User'
+            }))
+            : null;
+
         await logAction({
             client: interaction.client,
             guild: interaction.guild,
             action: '📝 Case Edited',
-            user: oldCase.user_id ? { id: oldCase.user_id } : null,
+            user: targetUser,
             moderator: interaction.user,
             reason: `Case #${caseNumber} reason was updated.`,
             color: BRAND_COLOR,
