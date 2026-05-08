@@ -16,7 +16,11 @@ const {
     handleAppealCaseSelect
 } = require('../../utils/appeals');
 
-const { handleLoggingRoleSelect } = require('./setupMenuHandler');
+const {
+    handleLoggingRoleSelect,
+    handleFullSetupRoleSelect,
+    handleApplicationPositionRoleSelect
+} = require('./setupMenuHandler');
 
 async function handleStringSelectMenu(interaction) {
     const { customId } = interaction;
@@ -39,6 +43,12 @@ async function handleStringSelectMenu(interaction) {
         return safeRun(interaction, `select ${customId}`, () => handleCreateApplication(interaction, positionId));
     }
 
+    if (customId === 'setup_application_position_role') {
+        return safeRun(interaction, `select ${customId}`, () =>
+            handleApplicationPositionRoleSelect(interaction)
+        );
+    }
+
     if (customId.startsWith('automod_select_')) {
         return safeRun(interaction, `select ${customId}`, () => handleAutomodProtectionSelect(interaction));
     }
@@ -58,6 +68,12 @@ async function handleStringSelectMenu(interaction) {
     if (customId === 'setup_logging_roles') {
         return safeRun(interaction, `select ${customId}`, () =>
             handleLoggingRoleSelect(interaction)
+        );
+    }
+
+    if (customId === 'setup_full_roles') {
+        return safeRun(interaction, `select ${customId}`, () =>
+            handleFullSetupRoleSelect(interaction)
         );
     }
 }

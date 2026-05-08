@@ -15,6 +15,10 @@ const {
     handleAppealDecisionModal
 } = require('../../utils/appeals');
 
+const {
+    handleApplicationPositionModal
+} = require('./setupMenuHandler');
+
 async function handleModal(interaction) {
     const { customId } = interaction;
 
@@ -54,6 +58,11 @@ async function handleModal(interaction) {
         const applicationId = customId.split('_')[3];
         return safeRun(interaction, `modal ${customId}`, () => handleDenyApplicationModal(interaction, applicationId));
     }
+    if (customId === 'setup_application_position_modal') {
+    return safeRun(interaction, `modal ${customId}`, () =>
+        handleApplicationPositionModal(interaction)
+    );
+}
 }
 
 module.exports = { handleModal };
