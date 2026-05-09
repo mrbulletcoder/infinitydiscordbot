@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS case_notes (
 
 CREATE TABLE IF NOT EXISTS warnings (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  case_number INT NULL,
   guild_id VARCHAR(32) NOT NULL,
   user_id VARCHAR(32) NOT NULL,
   moderator_id VARCHAR(32) NULL,
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS ticket_settings (
   category_id VARCHAR(32) NULL,
   panel_channel_id VARCHAR(32) NULL,
   transcript_channel_id VARCHAR(32) NULL,
+  appeal_transcript_channel_id VARCHAR(32) NULL,
   support_role_id VARCHAR(32) NULL,
   appeal_category_id VARCHAR(32) NULL,
   appeal_role_id VARCHAR(32) NULL,

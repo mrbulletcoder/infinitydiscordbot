@@ -7,6 +7,11 @@ const { giveMessageXp } = require('../utils/rank');
 const { logError } = require('../utils/errorHandler');
 const { pool } = require('../database');
 
+const {
+    relayAppealDmMessage,
+    relayAppealStaffMessage
+} = require('../utils/appeals');
+
 // ===== SAFE MESSAGE REPLY =====
 async function safeReply(message, options) {
     try {
@@ -66,7 +71,14 @@ module.exports = {
             if (!message) return;
             if (!message.author) return;
             if (message.author.bot) return;
-            if (!message.guild) return;
+            if (!message.guild) {
+                await relayAppealDmMessage(message);
+                return;
+            }
+
+            const wasAppealRelay = await relayAppealStaffMessage(message);
+            if (wasAppealRelay) return;
+            
             if (typeof message.content !== 'string') return;
 
             // ==================================================

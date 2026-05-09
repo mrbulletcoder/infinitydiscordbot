@@ -98,18 +98,6 @@ function buildWarnDmEmbed({ guild, moderator, reason }) {
 async function runWarn({ client, guild, user, moderator, reason }) {
     const timestamp = Math.floor(Date.now() / 1000);
 
-    const warningResult = await insertWarning({
-        guildId: guild.id,
-        userId: user.id,
-        moderatorId: moderator.id,
-        reason,
-        createdAt: timestamp
-    });
-
-    if (!warningResult.ok) {
-        throw new Error('Failed to save warning.');
-    }
-
     await user.send({
         embeds: [buildWarnDmEmbed({ guild, moderator, reason })]
     }).catch(() => null);
@@ -124,9 +112,24 @@ async function runWarn({ client, guild, user, moderator, reason }) {
         color: WARN_COLOR
     });
 
+    const caseNumber = getCaseNumber(logResult);
+
+    const warningResult = await insertWarning({
+        guildId: guild.id,
+        userId: user.id,
+        moderatorId: moderator.id,
+        reason,
+        createdAt: timestamp,
+        caseNumber
+    });
+
+    if (!warningResult.ok) {
+        throw new Error('Failed to save warning.');
+    }
+
     return {
-        caseNumber: getCaseNumber(logResult),
-        warningId: warningResult.warningId || warningResult.insertId || warningResult.id || null
+        caseNumber,
+        warningId: warningResult.result?.insertId || null
     };
 }
 

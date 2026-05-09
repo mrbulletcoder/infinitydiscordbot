@@ -27,6 +27,13 @@ module.exports = {
                 .addChannelTypes(ChannelType.GuildCategory)
                 .setRequired(true)
         )
+        .addChannelOption(option =>
+            option
+                .setName('transcripts')
+                .setDescription('Channel where appeal transcripts and logs will be sent')
+                .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+                .setRequired(true)
+        )
         .addRoleOption(option =>
             option
                 .setName('role')
@@ -40,6 +47,7 @@ module.exports = {
 
         try {
             const category = interaction.options.getChannel('category', true);
+            const transcripts = interaction.options.getChannel('transcripts', true);
             const role = interaction.options.getRole('role', true);
 
             await pool.query(
@@ -47,17 +55,20 @@ module.exports = {
         guild_id,
         appeal_category_id,
         appeal_role_id,
+        appeal_transcript_channel_id,
         updated_at
     )
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
         appeal_category_id = VALUES(appeal_category_id),
         appeal_role_id = VALUES(appeal_role_id),
+        appeal_transcript_channel_id = VALUES(appeal_transcript_channel_id),
         updated_at = VALUES(updated_at)`,
                 [
                     interaction.guild.id,
                     category.id,
                     role.id,
+                    transcripts.id,
                     Date.now()
                 ]
             );
@@ -70,6 +81,11 @@ module.exports = {
                     {
                         name: '📂 Appeal Category',
                         value: `${category}`,
+                        inline: true
+                    },
+                    {
+                        name: '📝 Appeal Transcripts',
+                        value: `${transcripts}`,
                         inline: true
                     },
                     {

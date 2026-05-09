@@ -8,13 +8,15 @@ const {
     StringSelectMenuBuilder,
     ModalBuilder,
     TextInputBuilder,
-    TextInputStyle
+    TextInputStyle,
+    AttachmentBuilder
 } = require('discord.js');
 
 const { pool } = require('../database');
 const {
     getCaseByNumber,
-    getAppealableCasesForUser
+    getAppealableCasesForUser,
+    deleteWarningByCase
 } = require('./moderationDb');
 const { safeReply } = require('../handlers/interactions/safeReply');
 
@@ -25,14 +27,15 @@ function reply(interaction, payload, ephemeral = true) {
 async function getTicketSettings(guildId) {
     const [rows] = await pool.query(
         `SELECT
-            category_id,
-            transcript_channel_id,
-            support_role_id,
-            appeal_category_id,
-            appeal_role_id
-         FROM ticket_settings
-         WHERE guild_id = ?
-         LIMIT 1`,
+    category_id,
+    transcript_channel_id,
+    support_role_id,
+    appeal_category_id,
+    appeal_role_id,
+    appeal_transcript_channel_id
+ FROM ticket_settings
+ WHERE guild_id = ?
+ LIMIT 1`,
         [guildId]
     );
 
@@ -51,13 +54,13 @@ async function getAppealById(appealId) {
     return rows[0] || null;
 }
 
-async function getAppealByCase(guildId, caseNumber, userId) {
+async function getAppealByCase(guildId, caseId, userId) {
     const [rows] = await pool.query(
         `SELECT *
          FROM appeals
-         WHERE guild_id = ? AND case_number = ? AND user_id = ?
+         WHERE guild_id = ? AND case_id = ? AND user_id = ?
          LIMIT 1`,
-        [guildId, caseNumber, userId]
+        [guildId, caseId, userId]
     );
 
     return rows[0] || null;
@@ -65,6 +68,7 @@ async function getAppealByCase(guildId, caseNumber, userId) {
 
 async function createAppealRecord({
     guildId,
+    caseId,
     caseNumber,
     userId,
     moderatorId,
@@ -72,10 +76,11 @@ async function createAppealRecord({
 }) {
     const [result] = await pool.query(
         `INSERT INTO appeals
-        (guild_id, case_number, user_id, moderator_id, reason, status, created_at)
-         VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+        (guild_id, case_id, case_number, user_id, moderator_id, reason, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
         [
             guildId,
+            caseId,
             caseNumber,
             userId,
             moderatorId || null,
@@ -123,6 +128,12 @@ function buildAppealButtons(appealId, claimedBy = null, decided = false) {
             .setLabel('Deny Appeal')
             .setEmoji('❌')
             .setStyle(ButtonStyle.Danger)
+            .setDisabled(decided),
+        new ButtonBuilder()
+            .setCustomId(`appeal_close_${appealId}`)
+            .setLabel('Close Appeal')
+            .setEmoji('🔒')
+            .setStyle(ButtonStyle.Secondary)
             .setDisabled(decided)
     );
 }
@@ -200,7 +211,7 @@ async function createAppealTicket({
 }) {
     const settings = await getTicketSettings(guild.id);
 
-    if (!settings?.appeal_category_id || !settings?.transcript_channel_id || !settings?.appeal_role_id) {
+    if (!settings?.appeal_category_id || !settings?.appeal_role_id || !settings?.appeal_transcript_channel_id) {
         throw new Error('Appeal system is not configured properly.');
     }
 
@@ -225,16 +236,6 @@ async function createAppealTicket({
             {
                 id: guild.roles.everyone.id,
                 deny: [PermissionFlagsBits.ViewChannel]
-            },
-            {
-                id: user.id,
-                allow: [
-                    PermissionFlagsBits.ViewChannel,
-                    PermissionFlagsBits.SendMessages,
-                    PermissionFlagsBits.ReadMessageHistory,
-                    PermissionFlagsBits.AttachFiles,
-                    PermissionFlagsBits.EmbedLinks
-                ]
             },
             {
                 id: settings.appeal_role_id,
@@ -289,10 +290,41 @@ async function createAppealTicket({
     });
 
     await tempChannel.send({
-        content: `${user} <@&${settings.appeal_role_id}>`,
+        content: `<@&${settings.appeal_role_id}>`,
         embeds: [embed],
         components: [buildAppealButtons(appeal.id)]
     });
+
+    await tempChannel.send({
+        embeds: [
+            new EmbedBuilder()
+                .setColor('#5865f2')
+                .setTitle('📡 Appeal Relay Active')
+                .setDescription(
+                    'This appeal channel is connected to the user through DMs.\n\n' +
+                    'Anything staff sends in this channel will be relayed to the user.\n' +
+                    'Anything the user sends in DMs will be relayed here.\n\n' +
+                    'Use the buttons above to claim, approve, deny, or close the appeal.'
+                )
+                .setFooter({ text: 'Infinity Appeals • Staff Relay' })
+                .setTimestamp()
+        ]
+    });
+
+    await user.send({
+        embeds: [
+            new EmbedBuilder()
+                .setColor('#00bfff')
+                .setTitle('📨 Appeal Ticket Opened')
+                .setDescription(
+                    `Your appeal for **Case #${caseData.case_number}** in **${guild.name}** is now open.\n\n` +
+                    'You can now send messages here, and they will be relayed to staff.\n\n' +
+                    '**Please explain your appeal clearly and wait for a staff response.**'
+                )
+                .setFooter({ text: 'Infinity Appeals • DM Relay' })
+                .setTimestamp()
+        ]
+    }).catch(() => null);
 
     return tempChannel;
 }
@@ -303,8 +335,9 @@ async function getAppealEligibleGuildsForUser(client, userId) {
          FROM cases c
          INNER JOIN ticket_settings ts ON ts.guild_id = c.guild_id
          WHERE c.user_id = ?
-           AND ts.category_id IS NOT NULL
-           AND ts.transcript_channel_id IS NOT NULL
+            AND ts.category_id IS NOT NULL
+            AND ts.appeal_category_id IS NOT NULL
+            AND ts.appeal_role_id IS NOT NULL
            AND (
                 c.action LIKE '%Ban%'
                 OR c.action LIKE '%Kick%'
@@ -403,26 +436,85 @@ async function handleAppealGuildSelect(interaction) {
 }
 
 async function handleAppealCaseSelect(interaction, guildId) {
+    await interaction.deferReply({ flags: 64 });
+
     const caseNumber = interaction.values[0];
 
-    const modal = new ModalBuilder()
-        .setCustomId(`appeal_modal_${guildId}_${caseNumber}`)
-        .setTitle(`Appeal Case #${caseNumber}`);
+    const caseResult = await getCaseByNumber(guildId, Number(caseNumber));
+    if (!caseResult.ok || !caseResult.rows.length) {
+        return reply(interaction, {
+            content: '❌ That case could not be found.'
+        }, true);
+    }
 
-    const reasonInput = new TextInputBuilder()
-        .setCustomId('appeal_reason')
-        .setLabel('Why should this case be appealed?')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
-        .setMinLength(10)
-        .setMaxLength(1000)
-        .setPlaceholder('Explain why you believe this moderation case should be reviewed.');
+    const caseData = caseResult.rows[0];
 
-    modal.addComponents(
-        new ActionRowBuilder().addComponents(reasonInput)
-    );
+    if (String(caseData.user_id) !== String(interaction.user.id)) {
+        return reply(interaction, {
+            content: '❌ You can only appeal your own cases.'
+        }, true);
+    }
 
-    return interaction.showModal(modal);
+    const existingAppeal = await getAppealByCase(guildId, caseData.id, interaction.user.id);
+
+    if (existingAppeal) {
+        const status = String(existingAppeal.status || 'unknown').toLowerCase();
+
+        if (['open', 'claimed'].includes(status)) {
+            return reply(interaction, {
+                content: '❌ You already have an open appeal for that case.'
+            }, true);
+        }
+
+        return reply(interaction, {
+            content:
+                `❌ You have already appealed this case before.\n` +
+                `Current status: **${status}**`
+        }, true);
+    }
+
+    const guild =
+        interaction.client.guilds.cache.get(guildId) ||
+        await interaction.client.guilds.fetch(guildId).catch(() => null);
+
+    if (!guild) {
+        return reply(interaction, {
+            content: '❌ I could not access that server anymore.'
+        }, true);
+    }
+
+    const appealId = await createAppealRecord({
+        guildId,
+        caseId: caseData.id,
+        caseNumber: Number(caseNumber),
+        userId: interaction.user.id,
+        moderatorId: caseData.moderator_id,
+        reason: 'DM relay appeal opened.'
+    });
+
+    const appeal = await getAppealById(appealId);
+
+    try {
+        const ticketChannel = await createAppealTicket({
+            client: interaction.client,
+            guild,
+            user: interaction.user,
+            appeal,
+            caseData
+        });
+
+        return reply(interaction, {
+            content:
+                `✅ Your appeal for **Case #${caseNumber}** has been opened.\n\n` +
+                `Please check your DMs and explain your appeal there.`
+        }, true);
+    } catch (error) {
+        console.error('create appeal relay error:', error);
+
+        return reply(interaction, {
+            content: '❌ Your appeal was saved, but the relay channel could not be created. Staff will need to check the setup.'
+        }, true);
+    }
 }
 
 async function getAppealCaseData(appeal) {
@@ -665,12 +757,10 @@ async function applyApprovedAppeal(interaction, appeal) {
     const action = String(caseData.action || '');
 
     if (action.includes('Warn')) {
-        await pool.query(
-            `DELETE FROM warnings
-             WHERE guild_id = ? AND user_id = ?
-             ORDER BY id DESC
-             LIMIT 1`,
-            [appeal.guild_id, appeal.user_id]
+        await deleteWarningByCase(
+            appeal.guild_id,
+            appeal.user_id,
+            appeal.case_number
         );
     } else if (action.includes('Timeout')) {
         const member =
@@ -743,18 +833,370 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
     const targetUser = await interaction.client.users.fetch(updatedAppeal.user_id).catch(() => null);
 
     if (targetUser) {
-        await targetUser.send(
-            `Your appeal for **Case #${updatedAppeal.case_number}** has been **${decision.toUpperCase()}**.\n\nReason: ${decisionReason}`
-        ).catch(() => null);
+        const decisionColor = decision === 'approved' ? '#00ff88' : '#ff4d4d';
+        const decisionEmoji = decision === 'approved' ? '✅' : '❌';
+        const decisionTitle = decision === 'approved' ? 'Appeal Approved' : 'Appeal Denied';
+
+        const dmEmbed = new EmbedBuilder()
+            .setColor(decisionColor)
+            .setTitle(`${decisionEmoji} ${decisionTitle}`)
+            .setDescription(
+                `Your appeal for **Case #${updatedAppeal.case_number}** in **${interaction.guild.name}** has been **${decision.toUpperCase()}**.`
+            )
+            .addFields(
+                {
+                    name: '📌 Appeal Information',
+                    value:
+                        `**Appeal ID:** \`#${updatedAppeal.id}\`\n` +
+                        `**Case Number:** \`#${updatedAppeal.case_number}\`\n` +
+                        `**Decision:** \`${decision.toUpperCase()}\``,
+                    inline: false
+                },
+                {
+                    name: '🛡️ Reviewed By',
+                    value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                    inline: true
+                },
+                {
+                    name: '📄 Staff Reason',
+                    value: `> ${decisionReason}`,
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Infinity Appeals • Decision Notice' })
+            .setTimestamp();
+
+        await targetUser.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
     await updateAppealTicketMessage(interaction, updatedAppeal);
 
     await interaction.editReply({
-        content: `✅ Appeal #${appealId} has been **${decision}**. This ticket will be deleted in 5 seconds.`
+        embeds: [
+            new EmbedBuilder()
+                .setColor(decision === 'approved' ? '#00ff88' : '#ff4d4d')
+                .setTitle(decision === 'approved' ? '✅ Appeal Approved' : '❌ Appeal Denied')
+                .setDescription(
+                    `Appeal **#${appealId}** has been **${decision.toUpperCase()}**.\n\n` +
+                    'This appeal channel will be deleted in **5 seconds**.'
+                )
+                .addFields(
+                    {
+                        name: '📌 Case',
+                        value: `\`#${updatedAppeal.case_number}\``,
+                        inline: true
+                    },
+                    {
+                        name: '👤 User',
+                        value: `<@${updatedAppeal.user_id}>\n\`${updatedAppeal.user_id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ Reviewed By',
+                        value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                        inline: true
+                    },
+                    {
+                        name: '📄 Decision Reason',
+                        value: `> ${decisionReason}`,
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Infinity Appeals • Staff Decision' })
+                .setTimestamp()
+        ]
+    });
+
+    await sendAppealLog({
+        interaction,
+        appeal: updatedAppeal,
+        action: decision === 'approved' ? '✅ Appeal Approved' : '❌ Appeal Denied',
+        color: decision === 'approved' ? '#00ff88' : '#ff4d4d',
+        reason: decisionReason
     });
 
     await deleteAppealTicketChannel(interaction, updatedAppeal);
+}
+
+function formatRelayContent(message) {
+    const content = message.content?.trim() || '*No text content*';
+
+    const attachments = message.attachments?.size
+        ? '\n\n**Attachments:**\n' + [...message.attachments.values()].map(a => a.url).join('\n')
+        : '';
+
+    return `${content}${attachments}`.slice(0, 4000);
+}
+
+async function getOpenAppealRelayByUser(client, userId) {
+    const [rows] = await pool.query(
+        `SELECT *
+         FROM appeals
+         WHERE user_id = ?
+           AND status IN ('open', 'claimed')
+           AND ticket_channel_id IS NOT NULL
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [userId]
+    );
+
+    const appeal = rows[0];
+    if (!appeal) return null;
+
+    const guild =
+        client.guilds.cache.get(appeal.guild_id) ||
+        await client.guilds.fetch(appeal.guild_id).catch(() => null);
+
+    if (!guild) return null;
+
+    const channel =
+        guild.channels.cache.get(appeal.ticket_channel_id) ||
+        await guild.channels.fetch(appeal.ticket_channel_id).catch(() => null);
+
+    if (!channel || !channel.isTextBased()) return null;
+
+    return { appeal, guild, channel };
+}
+
+async function getOpenAppealRelayByChannel(channelId) {
+    const [rows] = await pool.query(
+        `SELECT *
+         FROM appeals
+         WHERE ticket_channel_id = ?
+           AND status IN ('open', 'claimed')
+         LIMIT 1`,
+        [channelId]
+    );
+
+    return rows[0] || null;
+}
+
+async function relayAppealDmMessage(message) {
+    if (message.author.bot) return false;
+    if (!message.content?.trim() && !message.attachments?.size) return false;
+
+    const relay = await getOpenAppealRelayByUser(message.client, message.author.id);
+
+    if (!relay) return false;
+
+    const { appeal, guild, channel } = relay;
+
+    const embed = new EmbedBuilder()
+        .setAuthor({
+            name: `${message.author.tag} • Appeal User`,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+        })
+        .setColor('#00bfff')
+        .setDescription(formatRelayContent(message))
+        .setFooter({ text: `Appeal #${appeal.id} • DM Relay` })
+        .setTimestamp();
+
+    await channel.send({ embeds: [embed] }).catch(() => null);
+    await message.react('✅').catch(() => null);
+
+    return true;
+}
+
+async function relayAppealStaffMessage(message) {
+    if (!message.guild) return false;
+    if (message.author.bot) return false;
+    if (!message.content?.trim() && !message.attachments?.size) return false;
+    if (message.content.startsWith('!') || message.content.startsWith('/')) return false;
+
+    const appeal = await getOpenAppealRelayByChannel(message.channel.id);
+
+    if (!appeal) return false;
+
+    if (String(message.author.id) === String(appeal.user_id)) return false;
+
+    const user = await message.client.users.fetch(appeal.user_id).catch(() => null);
+    if (!user) return true;
+
+    const embed = new EmbedBuilder()
+        .setAuthor({
+            name: `${message.author.tag} • Staff`,
+            iconURL: message.author.displayAvatarURL({ dynamic: true })
+        })
+        .setColor('#5865f2')
+        .setDescription(formatRelayContent(message))
+        .setFooter({ text: 'Infinity Appeals • Staff Reply' })
+        .setTimestamp();
+
+    await user.send({ embeds: [embed] }).catch(() => null);
+    await message.react('✅').catch(() => null);
+
+    return true;
+}
+
+async function buildAppealTranscript(channel) {
+    let allMessages = [];
+    let lastId;
+
+    while (true) {
+        const fetched = await channel.messages.fetch({
+            limit: 100,
+            before: lastId
+        });
+
+        if (!fetched.size) break;
+
+        allMessages.push(...fetched.values());
+        lastId = fetched.last().id;
+
+        if (fetched.size < 100) break;
+    }
+
+    allMessages = allMessages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+    const lines = allMessages.map(msg => {
+        const timestamp = new Date(msg.createdTimestamp).toISOString();
+        const author = `${msg.author.tag} (${msg.author.id})`;
+
+        let content = msg.content || '';
+
+        if (!content && msg.embeds.length) {
+            content = msg.embeds
+                .map(embed => embed.description || embed.title || '[embed content]')
+                .join(' | ');
+        }
+
+        if (msg.attachments.size) {
+            content += `\nAttachments: ${[...msg.attachments.values()].map(a => a.url).join(', ')}`;
+        }
+
+        return `[${timestamp}] ${author}: ${content || '[no text content]'}`;
+    });
+
+    return lines.join('\n');
+}
+
+async function sendAppealLog({
+    interaction,
+    appeal,
+    action,
+    color,
+    reason = 'No reason provided.'
+}) {
+    const settings = await getTicketSettings(appeal.guild_id);
+
+    const transcriptChannel = settings?.appeal_transcript_channel_id
+    ? interaction.guild.channels.cache.get(settings.appeal_transcript_channel_id) ||
+      await interaction.guild.channels.fetch(settings.appeal_transcript_channel_id).catch(() => null)
+    : null;
+
+    if (!transcriptChannel) return null;
+
+    const transcriptText = await buildAppealTranscript(interaction.channel);
+    const transcriptAttachment = new AttachmentBuilder(
+        Buffer.from(transcriptText || 'No transcript data.', 'utf8'),
+        { name: `appeal-${appeal.id}-case-${appeal.case_number}-transcript.txt` }
+    );
+
+    const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(action)
+        .addFields(
+            {
+                name: '📌 Appeal',
+                value: `Appeal ID: \`#${appeal.id}\`\nCase: \`#${appeal.case_number}\``,
+                inline: true
+            },
+            {
+                name: '👤 User',
+                value: `<@${appeal.user_id}>\n\`${appeal.user_id}\``,
+                inline: true
+            },
+            {
+                name: '🛡️ Staff Member',
+                value: `${interaction.user.tag}\n\`${interaction.user.id}\``,
+                inline: true
+            },
+            {
+                name: '📄 Reason',
+                value: `> ${reason}`,
+                inline: false
+            }
+        )
+        .setFooter({ text: 'Infinity Appeals • Transcript Log' })
+        .setTimestamp();
+
+    return transcriptChannel.send({
+        embeds: [embed],
+        files: [transcriptAttachment]
+    }).catch(() => null);
+}
+
+async function handleCloseAppeal(interaction, appealId) {
+    const appeal = await getAppealById(appealId);
+
+    if (!appeal) {
+        return reply(interaction, {
+            content: '❌ Appeal not found.'
+        }, true);
+    }
+
+    const settings = await getTicketSettings(appeal.guild_id);
+
+    if (!isAppealStaff(interaction.member, settings)) {
+        return reply(interaction, {
+            content: '❌ Only configured appeal staff can close appeals.'
+        }, true);
+    }
+
+    if (appeal.status === 'closed' || appeal.status === 'approved' || appeal.status === 'denied') {
+        return reply(interaction, {
+            content: '❌ This appeal is already closed or decided.'
+        }, true);
+    }
+
+    await interaction.update({
+        content: '🔒 Closing appeal relay in 5 seconds...',
+        components: [],
+        embeds: []
+    }).catch(() => null);
+
+    await pool.query(
+        `UPDATE appeals
+     SET status = 'closed',
+         decision = 'closed',
+         decision_reason = 'Appeal relay closed by staff.',
+         decided_by = ?,
+         decided_at = ?
+     WHERE id = ?`,
+        [interaction.user.id, Date.now(), appealId]
+    );
+
+    const user = await interaction.client.users.fetch(appeal.user_id).catch(() => null);
+
+    if (user) {
+        await user.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor('#ff4d4d')
+                    .setTitle('🔒 Appeal Closed')
+                    .setDescription(
+                        `Your appeal for **Case #${appeal.case_number}** has been closed by staff.\n\n` +
+                        'This DM relay is now closed, and future messages will no longer be sent to staff.'
+                    )
+                    .setFooter({ text: 'Infinity Appeals • DM Relay Closed' })
+                    .setTimestamp()
+            ]
+        }).catch(() => null);
+    }
+
+    const updatedAppeal = await getAppealById(appealId);
+
+    await sendAppealLog({
+        interaction,
+        appeal: updatedAppeal || appeal,
+        action: '🔒 Appeal Closed',
+        color: '#ff4d4d',
+        reason: 'Appeal relay closed by staff.'
+    });
+
+    setTimeout(async () => {
+        await interaction.channel.delete(`Appeal ${appealId} closed by ${interaction.user.tag}`).catch(() => null);
+    }, 5000);
 }
 
 module.exports = {
@@ -770,5 +1212,8 @@ module.exports = {
     handleClaimAppeal,
     handleApproveAppeal,
     handleDenyAppeal,
-    handleAppealDecisionModal
+    handleCloseAppeal,
+    handleAppealDecisionModal,
+    relayAppealDmMessage,
+    relayAppealStaffMessage
 };

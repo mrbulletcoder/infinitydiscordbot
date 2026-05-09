@@ -22,13 +22,6 @@ const {
 async function handleModal(interaction) {
     const { customId } = interaction;
 
-    if (customId.startsWith('appeal_modal_')) {
-        const parts = customId.split('_');
-        const guildId = parts[2];
-        const caseNumber = parts[3];
-        return safeRun(interaction, `modal ${customId}`, () => handleAppealModal(interaction, guildId, caseNumber));
-    }
-
     if (customId.startsWith('appeal_approve_modal_')) {
         const appealId = customId.split('_')[3];
         return safeRun(interaction, `modal ${customId}`, () => handleAppealDecisionModal(interaction, appealId, 'approved'));

@@ -34,7 +34,8 @@ const {
 const {
     handleClaimAppeal,
     handleApproveAppeal,
-    handleDenyAppeal
+    handleDenyAppeal,
+    handleCloseAppeal
 } = require('../../utils/appeals');
 
 const { handleSetupButton } = require('./setupMenuHandler');
@@ -59,6 +60,11 @@ async function handleButton(interaction) {
     if (customId.startsWith('appeal_deny_')) {
         const appealId = customId.split('_')[2];
         return safeRun(interaction, `button ${customId}`, () => handleDenyAppeal(interaction, appealId));
+    }
+
+    if (customId.startsWith('appeal_close_')) {
+        const appealId = customId.split('_')[2];
+        return safeRun(interaction, `button ${customId}`, () => handleCloseAppeal(interaction, appealId));
     }
 
     if (customId.startsWith('report_claim_')) {

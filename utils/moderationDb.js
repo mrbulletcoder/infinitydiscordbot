@@ -20,21 +20,30 @@ async function safeExecute(query, params = []) {
     }
 }
 
-async function insertWarning({ guildId, userId, moderatorId, reason, createdAt }) {
+async function insertWarning({ guildId, userId, moderatorId, reason, createdAt, caseNumber = null }) {
     return safeExecute(
-        `INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [guildId, userId, moderatorId, reason, createdAt]
+        `INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at, case_number)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [guildId, userId, moderatorId, reason, createdAt, caseNumber]
     );
 }
 
 async function getWarnings(guildId, userId) {
     return safeQuery(
-        `SELECT id, reason, moderator_id, created_at
+        `SELECT id, case_number, reason, moderator_id, created_at
          FROM warnings
          WHERE guild_id = ? AND user_id = ?
          ORDER BY id ASC`,
         [guildId, userId]
+    );
+}
+
+async function deleteWarningByCase(guildId, userId, caseNumber) {
+    return safeExecute(
+        `DELETE FROM warnings
+         WHERE guild_id = ? AND user_id = ? AND case_number = ?
+         LIMIT 1`,
+        [guildId, userId, caseNumber]
     );
 }
 
@@ -188,6 +197,7 @@ module.exports = {
     safeExecute,
     insertWarning,
     getWarnings,
+    deleteWarningByCase,
     deleteWarningById,
     clearWarnings,
     getCaseByNumber,
