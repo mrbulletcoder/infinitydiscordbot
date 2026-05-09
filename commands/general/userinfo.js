@@ -151,7 +151,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -164,7 +164,7 @@ module.exports = {
 
         const reply = (payload) => {
             return isSlash
-                ? safeReply(ctx, payload, true)
+                ? safeReply(ctx, payload)
                 : ctx.reply(payload);
         };
 

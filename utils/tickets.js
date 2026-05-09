@@ -94,6 +94,8 @@ function buildTicketName(ticketId, username) {
 
 async function handleCreateTicket(interaction) {
     try {
+        await interaction.deferReply({ flags: 64 });
+
         const cooldownKey = `${interaction.guild.id}:${interaction.user.id}`;
         const now = Date.now();
         const existingCooldown = createCooldown.get(cooldownKey);

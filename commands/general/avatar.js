@@ -73,7 +73,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
@@ -125,7 +125,7 @@ module.exports = {
             .setTimestamp();
 
         if (isSlash) {
-            return safeReply(ctx, { embeds: [embed] }, true);
+            return safeReply(ctx, { embeds: [embed] });
         }
 
         return ctx.reply({ embeds: [embed] });

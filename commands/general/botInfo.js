@@ -32,7 +32,7 @@ module.exports = {
         .setDescription('View detailed information about Infinity'),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         const client = interaction.client;
@@ -101,6 +101,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Bot • System Intelligence ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] });
     }
 };

@@ -205,6 +205,8 @@ async function handleCreateApplication(interaction, positionId) {
 }
 
 async function handleApplicationModal(interaction, positionId) {
+    await interaction.deferReply({ flags: 64 });
+
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
@@ -230,7 +232,7 @@ async function handleApplicationModal(interaction, positionId) {
     );
 
     if (pendingRows.length) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You already have a pending application.'
         }, true);
     }
@@ -238,7 +240,7 @@ async function handleApplicationModal(interaction, positionId) {
     const cooldown = await checkApplicationCooldown(interaction.guild.id, interaction.user.id);
 
     if (cooldown) {
-        return reply(interaction,{
+        return reply(interaction, {
             content:
                 `❌ You are on application cooldown.\n` +
                 `You can apply again in **${cooldown.remainingText}**.\n` +
@@ -342,7 +344,7 @@ async function handleApplicationModal(interaction, positionId) {
         components: [buildApplicationButtons(applicationId)]
     });
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ Your application for **${position.name}** has been submitted successfully.`
     }, true);
 }
@@ -474,6 +476,7 @@ async function handleDenyApplication(interaction, applicationId) {
 }
 
 async function handleDenyApplicationModal(interaction, applicationId) {
+    await interaction.deferReply({ flags: 64 });
 
     const [rows] = await pool.query(
         `SELECT *

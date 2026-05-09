@@ -177,9 +177,11 @@ function buildReportEmbed({
 async function updateReportMessage(interaction, report, overrides = {}, disableButtons = false) {
     const reporter = await fetchUser(interaction.client, report.reporter_id);
     const target = await fetchUser(interaction.client, report.reported_user_id);
+
     const claimedBy = overrides.claimedBy !== undefined
         ? overrides.claimedBy
         : await fetchUser(interaction.client, report.claimed_by);
+
     const handledBy = overrides.handledBy !== undefined
         ? overrides.handledBy
         : await fetchUser(interaction.client, report.handled_by);
@@ -198,9 +200,29 @@ async function updateReportMessage(interaction, report, overrides = {}, disableB
         submittedAt: report.created_at
     });
 
-    await interaction.message.edit({
+    let reportMessage = interaction.message || null;
+
+    if (!reportMessage && report.channel_id && report.message_id) {
+        const channel =
+            interaction.guild.channels.cache.get(report.channel_id) ||
+            await interaction.guild.channels.fetch(report.channel_id).catch(() => null);
+
+        if (channel) {
+            reportMessage = await channel.messages.fetch(report.message_id).catch(() => null);
+        }
+    }
+
+    if (!reportMessage) {
+        console.warn(`Could not find report message for report ID ${report.id}`);
+        return null;
+    }
+
+    return reportMessage.edit({
         embeds: [embed],
         components: buildReportButtons(report.id, disableButtons)
+    }).catch(error => {
+        console.error('Failed to update report message:', error);
+        return null;
     });
 }
 
@@ -214,7 +236,7 @@ async function handleClaimReport(interaction, reportId) {
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Report not found.'
         }, true);
     }
@@ -222,13 +244,13 @@ async function handleClaimReport(interaction, reportId) {
     const currentStatus = String(report.status || '').toLowerCase();
 
     if (!['open', 'claimed'].includes(currentStatus)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This report is already ${report.status}.`
         }, true);
     }
 
     if (report.claimed_by && report.claimed_by !== interaction.user.id) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ This report has already been claimed by another staff member.'
         }, true);
     }
@@ -257,14 +279,14 @@ async function handleClaimReport(interaction, reportId) {
         false
     );
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ You claimed report case #${report.case_number}.`
     }, true);
 }
 
 async function handleResolveReport(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only staff can manage reports.',
         }, true);
     }
@@ -272,13 +294,13 @@ async function handleResolveReport(interaction, reportId) {
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Report not found.',
         }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This report is already ${report.status}.`,
         }, true);
     }
@@ -303,7 +325,7 @@ async function handleResolveReport(interaction, reportId) {
 
 async function handleDismissReport(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only staff can manage reports.',
         }, true);
     }
@@ -311,13 +333,13 @@ async function handleDismissReport(interaction, reportId) {
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Report not found.',
         }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This report is already ${report.status}.`,
         }, true);
     }
@@ -342,21 +364,23 @@ async function handleDismissReport(interaction, reportId) {
 
 async function handleResolveReportModal(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only staff can manage reports.',
         }, true);
     }
 
+    await interaction.deferReply({ flags: 64 });
+
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Report not found.'
         }, true);
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This report is already ${report.status}.`
         }, true);
     }
@@ -450,28 +474,30 @@ async function handleResolveReportModal(interaction, reportId) {
         await target.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ Report case #${report.case_number} resolved.`
     }, true);
 }
 
 async function handleDismissReportModal(interaction, reportId) {
     if (!hasReportStaffPerms(interaction.member)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only staff can manage reports.',
         }, true);
     }
 
+    await interaction.deferReply({ flags: 64 });
+
     const report = await getReportById(interaction.guild.id, reportId);
 
     if (!report) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Report not found.'
         });
     }
 
     if (!['open', 'claimed'].includes(String(report.status || '').toLowerCase())) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This report is already ${report.status}.`
         }, true);
     }
@@ -541,7 +567,7 @@ async function handleDismissReportModal(interaction, reportId) {
         await reporter.send({ embeds: [dmEmbed] }).catch(() => null);
     }
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ Report case #${report.case_number} dismissed.`
     }, true);
 }

@@ -138,7 +138,7 @@ module.exports = {
         await safeReply(interaction, {
             content: '⏳ Calculating performance...',
             fetchReply: true
-        }, true);
+        });
 
         const end = Date.now();
 
@@ -160,6 +160,6 @@ module.exports = {
             content: null,
             embeds: [embed],
             components: [button]
-        }, true);
+        });
     }
 };

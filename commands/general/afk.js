@@ -57,7 +57,7 @@ module.exports = {
             .setTimestamp();
 
         if (isSlash) {
-            return safeReply(ctx, { embeds: [embed] }, true);
+            return safeReply(ctx, { embeds: [embed] });
         }
 
         return ctx.reply({ embeds: [embed] });

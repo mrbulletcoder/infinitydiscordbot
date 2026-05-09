@@ -250,7 +250,7 @@ module.exports = {
 
             return safeReply(interaction, {
                 embeds: [createCommandEmbed(cmd)]
-            }, true);
+            });
         }
 
         return sendHelp(interaction, interaction.client, true);
@@ -263,7 +263,7 @@ async function sendHelp(ctx, client, isSlash = false) {
     const menu = createHelpMenu(categories, 'overview');
 
     if (isSlash) {
-        return safeReply(ctx, { embeds: [embed], components: [menu] }, true);
+        return safeReply(ctx, { embeds: [embed], components: [menu] });
     }
 
     return ctx.reply({ embeds: [embed], components: [menu] });

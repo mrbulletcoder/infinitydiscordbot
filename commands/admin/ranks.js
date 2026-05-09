@@ -15,7 +15,8 @@ const {
     addBlacklistChannel,
     removeBlacklistChannel,
     setRankMode,
-    setRankXpConfig
+    setRankXpConfig,
+    setRankEnabled
 } = require('../../utils/rank');
 
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
@@ -39,6 +40,18 @@ module.exports = {
             sub
                 .setName('config')
                 .setDescription('View current rank settings')
+        )
+
+        .addSubcommand(sub =>
+            sub
+                .setName('enable')
+                .setDescription('Enable the rank XP system')
+        )
+
+        .addSubcommand(sub =>
+            sub
+                .setName('disable')
+                .setDescription('Disable the rank XP system')
         )
 
         .addSubcommand(sub =>
@@ -147,6 +160,18 @@ module.exports = {
             const sub = interaction.options.getSubcommand();
             const guildId = interaction.guild.id;
 
+            if (sub === 'enable' || sub === 'disable') {
+                const enabled = sub === 'enable';
+
+                await setRankEnabled(guildId, enabled);
+
+                return safeReply(interaction, {
+                    content: enabled
+                        ? '✅ Rank XP system has been **enabled**.'
+                        : '✅ Rank XP system has been **disabled**.'
+                }, true);
+            }
+
             if (sub === 'config') {
                 const settings = await getRankSettings(guildId);
                 const whitelist = await getWhitelistChannels(guildId);
@@ -156,6 +181,11 @@ module.exports = {
                     .setTitle('🏆 Infinity Rank Settings')
                     .setColor('#00bfff')
                     .addFields(
+                        {
+                            name: 'Status',
+                            value: Number(settings.enabled) ? '✅ Enabled' : '❌ Disabled',
+                            inline: true
+                        },
                         {
                             name: 'Mode',
                             value: settings.mode === 'all_whitelisted' ? 'All Whitelisted' : 'Whitelist Only',
@@ -180,7 +210,7 @@ module.exports = {
                             value: blacklist.length ? blacklist.map(id => `<#${id}>`).join(', ') : 'None set'
                         }
                     )
-                    .setFooter({ text: 'All channels are whitelisted by default unless blacklisted' })
+                    .setFooter({ text: 'Use /ranks enable to turn XP tracking on' })
                     .setTimestamp();
 
                 return safeReply(interaction, { embeds: [embed] }, true);

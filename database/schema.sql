@@ -151,9 +151,11 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE TABLE IF NOT EXISTS automod_config (
   guild_id VARCHAR(32) NOT NULL PRIMARY KEY,
-  spam_enabled TINYINT(1) NOT NULL DEFAULT 1,
-  links_enabled TINYINT(1) NOT NULL DEFAULT 1,
-  caps_enabled TINYINT(1) NOT NULL DEFAULT 1
+  spam_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  links_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  invites_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  caps_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  filter_enabled TINYINT(1) NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS automod_offenses (
@@ -229,6 +231,7 @@ CREATE TABLE IF NOT EXISTS reaction_role_messages (
 
 CREATE TABLE IF NOT EXISTS rank_settings (
   guild_id VARCHAR(32) NOT NULL PRIMARY KEY,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
   mode VARCHAR(32) NOT NULL DEFAULT 'all_whitelisted',
   xp_min INT NOT NULL DEFAULT 15,
   xp_max INT NOT NULL DEFAULT 25,
@@ -282,7 +285,7 @@ CREATE TABLE IF NOT EXISTS giveaways (
 
 CREATE TABLE IF NOT EXISTS infinity_log_settings (
   guild_id VARCHAR(32) NOT NULL PRIMARY KEY,
-  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
   moderation_channel_id VARCHAR(32) NULL,
   message_channel_id VARCHAR(32) NULL,
   member_channel_id VARCHAR(32) NULL,

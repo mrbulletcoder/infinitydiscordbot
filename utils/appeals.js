@@ -396,7 +396,7 @@ async function handleAppealGuildSelect(interaction) {
             .addOptions(options)
     );
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: 'Select the case you want to appeal.',
         components: [row],
     }, true);
@@ -462,12 +462,13 @@ async function updateAppealTicketMessage(interaction, appeal) {
 }
 
 async function handleAppealModal(interaction, guildId, caseNumber) {
+    await interaction.deferReply({ flags: 64 });
 
     const appealReason = interaction.fields.getTextInputValue('appeal_reason')?.trim();
 
     const caseResult = await getCaseByNumber(guildId, Number(caseNumber));
     if (!caseResult.ok || !caseResult.rows.length) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ That case could not be found.'
         }, true);
     }
@@ -475,14 +476,14 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
     const caseData = caseResult.rows[0];
 
     if (String(caseData.user_id) !== String(interaction.user.id)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You can only appeal your own cases.'
         }, true);
     }
 
     const existingAppeal = await getAppealByCase(guildId, Number(caseNumber), interaction.user.id);
     if (existingAppeal) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You have already submitted an appeal for that case.'
         }, true);
     }
@@ -492,7 +493,7 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
         await interaction.client.guilds.fetch(guildId).catch(() => null);
 
     if (!guild) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ I could not access that server anymore.'
         }, true);
     }
@@ -516,13 +517,13 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
             caseData
         });
 
-        return reply(interaction,{
+        return reply(interaction, {
             content: `✅ Your appeal for **Case #${caseNumber}** has been submitted. Staff ticket: ${ticketChannel}`
         }, true);
     } catch (error) {
         console.error('create appeal ticket error:', error);
 
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Your appeal was saved, but the ticket could not be created. Staff will need to check the setup.'
         }, true);
     }
@@ -531,7 +532,7 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
 async function handleClaimAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Appeal not found.',
         }, true);
     }
@@ -539,13 +540,13 @@ async function handleClaimAppeal(interaction, appealId) {
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only configured appeal staff can manage appeal tickets.',
         }, true);
     }
 
     if (appeal.claimed_by) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: `❌ This appeal has already been claimed by <@${appeal.claimed_by}>.`,
         }, true);
     }
@@ -560,7 +561,7 @@ async function handleClaimAppeal(interaction, appealId) {
     const updatedAppeal = await getAppealById(appealId);
     await updateAppealTicketMessage(interaction, updatedAppeal);
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ You claimed appeal #${appealId}.`,
     }, true);
 }
@@ -568,7 +569,7 @@ async function handleClaimAppeal(interaction, appealId) {
 async function handleApproveAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Appeal not found.',
         }, true);
     }
@@ -576,7 +577,7 @@ async function handleApproveAppeal(interaction, appealId) {
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only configured appeal staff can resolve appeals.',
         }, true);
     }
@@ -602,7 +603,7 @@ async function handleApproveAppeal(interaction, appealId) {
 async function handleDenyAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Appeal not found.',
         }, true);
     }
@@ -610,7 +611,7 @@ async function handleDenyAppeal(interaction, appealId) {
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only configured appeal staff can resolve appeals.',
         }, true);
     }
@@ -694,10 +695,11 @@ async function applyApprovedAppeal(interaction, appeal) {
 }
 
 async function handleAppealDecisionModal(interaction, appealId, decision) {
+    await interaction.deferReply({ flags: 64 });
 
     const appeal = await getAppealById(appealId);
     if (!appeal) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Appeal not found.'
         }, true);
     }
@@ -705,13 +707,13 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Only configured appeal staff can resolve appeals.'
         }, true);
     }
 
     if (appeal.status === 'approved' || appeal.status === 'denied') {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ This appeal has already been decided.'
         }, true);
     }

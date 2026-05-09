@@ -6,7 +6,8 @@ const {
 const {
     getLeaderboard,
     buildLeaderboardAttachment,
-    calculateLevelFromXp
+    calculateLevelFromXp,
+    getRankSettings
 } = require('../../utils/rank');
 
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
@@ -22,10 +23,20 @@ module.exports = {
         .setDescription('View the server rank leaderboard'),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         try {
+            const settings = await getRankSettings(interaction.guild.id);
+
+            if (!Number(settings.enabled)) {
+                return safeReply(interaction, {
+                    content:
+                        '❌ The rank system is currently disabled in this server.\n' +
+                        'An administrator can enable it using `/ranks enable`.'
+                }, true);
+            }
+
             const rows = await getLeaderboard(interaction.guild.id, 10, 0);
 
             if (!rows.length) {
@@ -64,7 +75,7 @@ module.exports = {
 
             return safeReply(interaction, {
                 files: [attachment]
-            }, true);
+            });
         } catch (error) {
             console.error('Leaderboard command error:', error);
 

@@ -66,7 +66,7 @@ module.exports = {
             return safeReply(ctx, {
                 embeds: [embed],
                 components: [row]
-            }, true);
+            });
         }
 
         return ctx.reply({

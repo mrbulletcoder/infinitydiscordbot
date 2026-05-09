@@ -9,6 +9,8 @@ const {
 
 const { pool } = require('../../database');
 
+const { getLogSettings } = require('../../utils/advancedLogger');
+
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
 const recentReportPairs = new Map();
@@ -20,7 +22,7 @@ const REPORT_BURST_LIMIT = 3;
 
 async function getGuildSettings(guildId) {
     const [rows] = await pool.query(
-        `SELECT mod_logs, report_cooldown_seconds
+        `SELECT report_cooldown_seconds
          FROM guild_settings
          WHERE guild_id = ?
          LIMIT 1`,
@@ -30,14 +32,30 @@ async function getGuildSettings(guildId) {
     return rows[0] || null;
 }
 
-async function getModLogsChannel(guild) {
-    const settings = await getGuildSettings(guild.id);
-    const channelId = settings?.mod_logs;
+async function getAdvancedModerationLogChannel(guild) {
+    const settings = await getLogSettings(guild.id).catch(() => null);
+    const channelId = settings?.moderation_logs;
 
-    if (!channelId) return null;
+    if (!Number(settings?.enabled) || !channelId) return null;
 
-    return guild.channels.cache.get(channelId) ||
+    const channel =
+        guild.channels.cache.get(channelId) ||
         await guild.channels.fetch(channelId).catch(() => null);
+
+    if (!channel) return null;
+
+    const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const permissions = me ? channel.permissionsFor(me) : null;
+
+    if (
+        !permissions?.has(PermissionFlagsBits.ViewChannel) ||
+        !permissions?.has(PermissionFlagsBits.SendMessages) ||
+        !permissions?.has(PermissionFlagsBits.EmbedLinks)
+    ) {
+        return null;
+    }
+
+    return channel;
 }
 
 function formatDuration(ms) {
@@ -377,6 +395,11 @@ function buildReporterSuccessEmbed(target, reason, caseNumber) {
                 inline: true
             },
             {
+                name: '📨 Staff Notification',
+                value: '`Sent to moderation logs if configured`',
+                inline: true
+            },
+            {
                 name: '📄 Reason',
                 value: reason,
                 inline: false
@@ -529,11 +552,11 @@ module.exports = {
 
         const caseNumber = reportRecord.caseNumber;
         const reportId = reportRecord.reportId;
-        const modLogsChannel = await getModLogsChannel(guild);
+        const moderationLogChannel = await getAdvancedModerationLogChannel(guild);
 
         let sentMessage = null;
 
-        if (modLogsChannel) {
+        if (moderationLogChannel) {
             const embed = buildReportEmbed({
                 guild,
                 caseNumber,
@@ -543,10 +566,13 @@ module.exports = {
                 reason
             });
 
-            sentMessage = await modLogsChannel.send({
+            sentMessage = await moderationLogChannel.send({
                 embeds: [embed],
                 components: buildReportButtons(reportId)
-            }).catch(() => null);
+            }).catch(error => {
+                console.error('Failed to send report to advanced moderation logs:', error);
+                return null;
+            });
         }
 
         if (sentMessage) {

@@ -28,9 +28,16 @@ function invalidateAutomodCache(guildId) {
 
 async function ensureAutomodConfig(guildId) {
     await pool.query(
-        `INSERT INTO automod_config (guild_id)
-         VALUES (?)
-         ON DUPLICATE KEY UPDATE guild_id = guild_id`,
+        `INSERT INTO automod_config (
+            guild_id,
+            spam_enabled,
+            links_enabled,
+            invites_enabled,
+            caps_enabled,
+            filter_enabled
+        )
+        VALUES (?, 0, 0, 0, 0, 0)
+        ON DUPLICATE KEY UPDATE guild_id = guild_id`,
         [guildId]
     );
 }
@@ -49,11 +56,11 @@ async function getAutomodConfig(guildId) {
     );
 
     const data = rows[0] || {
-        spam_enabled: 1,
-        links_enabled: 1,
-        invites_enabled: 1,
-        caps_enabled: 1,
-        filter_enabled: 1
+        spam_enabled: 0,
+        links_enabled: 0,
+        invites_enabled: 0,
+        caps_enabled: 0,
+        filter_enabled: 0
     };
 
     configCache.set(guildId, {

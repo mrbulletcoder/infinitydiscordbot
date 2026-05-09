@@ -415,7 +415,7 @@ async function buildLeaderboardAttachment({ guild, leaderboardRows }) {
         if (row.avatarUrl) {
             try {
                 await drawAvatarCircle(ctx, row.avatarUrl, 180, y + 16, 60);
-            } catch {}
+            } catch { }
         }
 
         ctx.fillStyle = '#ffffff';
@@ -435,7 +435,7 @@ async function buildLeaderboardAttachment({ guild, leaderboardRows }) {
 
     ctx.fillStyle = 'rgba(255,255,255,0.54)';
     ctx.font = '20px Arial';
-    
+
 
     const buffer = await canvas.encode('png');
     return new AttachmentBuilder(buffer, { name: 'leaderboard.png' });
@@ -456,6 +456,7 @@ async function getRankSettings(guildId) {
 
     return {
         guild_id: guildId,
+        enabled: 0,
         mode: 'all_whitelisted',
         xp_min: 15,
         xp_max: 25,
@@ -541,10 +542,14 @@ async function giveMessageXp(message) {
     const userId = message.author.id;
     const channelId = message.channel.id;
 
+    const settings = await getRankSettings(guildId);
+
+    if (!Number(settings.enabled)) {
+        return null;
+    }
+
     const isAllowed = await canEarnXp(guildId, channelId);
     if (!isAllowed) return null;
-
-    const settings = await getRankSettings(guildId);
 
     if (!canGainXpNow(guildId, userId, settings.xp_cooldown_seconds)) {
         await incrementMessageCount(guildId, userId, false);
@@ -616,6 +621,17 @@ async function removeBlacklistChannel(guildId, channelId) {
     await pool.query(
         `DELETE FROM rank_blacklist_channels WHERE guild_id = ? AND channel_id = ?`,
         [guildId, channelId]
+    );
+}
+
+async function setRankEnabled(guildId, enabled) {
+    await getRankSettings(guildId);
+
+    await pool.query(
+        `UPDATE rank_settings
+         SET enabled = ?
+         WHERE guild_id = ?`,
+        [enabled ? 1 : 0, guildId]
     );
 }
 
@@ -709,6 +725,7 @@ module.exports = {
     removeBlacklistChannel,
     setRankMode,
     setRankXpConfig,
+    setRankEnabled,
     getUserRankPosition,
     getLeaderboard,
     getRankCardData,

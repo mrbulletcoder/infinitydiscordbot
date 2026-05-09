@@ -101,7 +101,7 @@ async function ensureLoggingTable() {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS infinity_log_settings (
             guild_id VARCHAR(32) PRIMARY KEY,
-            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            enabled TINYINT(1) NOT NULL DEFAULT 0,
             message_logs VARCHAR(32) NULL,
             member_logs VARCHAR(32) NULL,
             role_logs VARCHAR(32) NULL,
@@ -132,11 +132,11 @@ async function getLogSettings(guildId) {
 
     if (!settings) {
         await pool.query(
-            'INSERT INTO infinity_log_settings (guild_id, enabled) VALUES (?, 1)',
+            'INSERT INTO infinity_log_settings (guild_id, enabled) VALUES (?, 0)',
             [guildId]
         );
 
-        settings = { guild_id: guildId, enabled: 1, ignored_channels: null };
+        settings = { guild_id: guildId, enabled: 0, ignored_channels: null };
     }
 
     cache.set(guildId, { time: Date.now(), data: settings });

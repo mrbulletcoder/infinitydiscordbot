@@ -110,7 +110,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         return this.sendStats(interaction, interaction.guild, true);
@@ -119,7 +119,7 @@ module.exports = {
     async sendStats(ctx, guild, isSlash = false) {
         const reply = payload => {
             return isSlash
-                ? safeReply(ctx, payload, true)
+                ? safeReply(ctx, payload)
                 : ctx.reply(payload);
         };
 

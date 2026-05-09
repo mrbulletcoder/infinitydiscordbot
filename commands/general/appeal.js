@@ -41,7 +41,7 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
 
         if (!interaction.guild) {
@@ -79,7 +79,7 @@ module.exports = {
             return safeReply(interaction, {
                 embeds: [embed],
                 components: [row]
-            }, true);
+            });
         }
 
         const result = await getAppealableCasesForUser(
@@ -116,6 +116,6 @@ module.exports = {
         return safeReply(interaction, {
             content: 'Select the case you want to appeal.',
             components: [row]
-        }, true);
+        });
     }
 };
