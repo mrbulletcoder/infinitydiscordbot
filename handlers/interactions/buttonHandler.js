@@ -2,6 +2,9 @@ const { safeRun } = require('./safeReply');
 const { runReportButtonAction } = require('./reportActionGuard');
 const { handleRefreshPing } = require('./pingHandler');
 const { handleAutomodModeButton } = require('./automodInteractionHandler');
+const { handleSetupButton } = require('./setupMenuHandler');
+const { handleHighLowButton } = require('../../commands/economy/highlow');
+const { handleBlackjackButton } = require('../../commands/economy/blackjack');
 
 const {
     handleGiveawayEnter,
@@ -38,10 +41,16 @@ const {
     handleCloseAppeal
 } = require('../../utils/appeals');
 
-const { handleSetupButton } = require('./setupMenuHandler');
-
 async function handleButton(interaction) {
     const { customId } = interaction;
+
+    if (customId.startsWith('highlow_')) {
+        return safeRun(interaction, `button ${customId}`, () => handleHighLowButton(interaction));
+    }
+
+    if (customId.startsWith('blackjack_')) {
+        return safeRun(interaction, `button ${customId}`, () => handleBlackjackButton(interaction));
+    }
 
     if (customId.startsWith('setup_')) {
         return safeRun(interaction, `button ${customId}`, () => handleSetupButton(interaction));

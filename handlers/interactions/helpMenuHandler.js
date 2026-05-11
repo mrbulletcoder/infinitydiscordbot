@@ -1,5 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 
+const { safeReply, safeDeferUpdate } = require('./safeReply');
+
 async function handleHelpMenu(interaction) {
     const selected = interaction.values[0];
     const HELP_COLOR = '#00bfff';
@@ -102,7 +104,13 @@ async function handleHelpMenu(interaction) {
         }
     }
 
-    return interaction.update({ embeds: [embed], components: [menu] });
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
+        embeds: [embed],
+        components: [menu]
+    });
 }
 
 module.exports = { handleHelpMenu };

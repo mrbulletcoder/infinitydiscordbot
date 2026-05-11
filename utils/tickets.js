@@ -8,7 +8,7 @@ const {
     AttachmentBuilder
 } = require('discord.js');
 const { pool } = require('../database');
-const { safeReply } = require('../handlers/interactions/safeReply');
+const { safeReply, safeDefer, safeDeferUpdate } = require('../handlers/interactions/safeReply');
 
 const createCooldown = new Map();
 
@@ -94,7 +94,8 @@ function buildTicketName(ticketId, username) {
 
 async function handleCreateTicket(interaction) {
     try {
-        await interaction.deferReply({ flags: 64 });
+        const deferred = await safeDefer(interaction, true);
+        if (!deferred) return;
 
         const cooldownKey = `${interaction.guild.id}:${interaction.user.id}`;
         const now = Date.now();
@@ -280,17 +281,18 @@ async function handleClaimTicket(interaction, ticketId) {
             }, true);
         }
 
-        await interaction.deferUpdate();
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
 
         const ticket = await getTicketByChannel(interaction.guild.id, interaction.channel.id);
         if (!ticket || String(ticket.id) !== String(ticketId)) {
-            return interaction.followUp({
+            return safeReply(interaction, {
                 content: '❌ This ticket record could not be found.',
             });
         }
 
         if (ticket.claimed_by) {
-            return interaction.followUp({
+            return safeReply(interaction, {
                 content: '❌ This ticket has already been claimed.',
             });
         }
@@ -338,14 +340,14 @@ async function handleClaimTicket(interaction, ticketId) {
             components: [buildTicketButtons(ticket.id, interaction.user.id)]
         });
 
-        return interaction.followUp({
+        return safeReply(interaction, {
             content: `✅ You claimed ticket #${ticket.id}.`,
         });
     } catch (error) {
         console.error('handleClaimTicket error:', error);
 
         if (interaction.deferred || interaction.replied) {
-            return interaction.followUp({
+            return safeReply(interaction, {
                 content: '❌ Failed to claim ticket.',
             }).catch(() => { });
         }
@@ -522,7 +524,7 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
             [Date.now(), ticket.id]
         );
 
-        await interaction.followUp({
+        await safeReply(interaction, {
             content: '🔒 Ticket closed. This channel will be deleted in 5 seconds.',
             flags: 64
         }).catch(() => null);
@@ -546,7 +548,10 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
 }
 
 async function handleCloseTicketCancel(interaction, ticketId) {
-    return interaction.update({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         content: '❌ Ticket close cancelled.',
         components: [],
         embeds: []

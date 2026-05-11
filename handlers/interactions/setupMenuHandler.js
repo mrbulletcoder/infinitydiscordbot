@@ -345,6 +345,9 @@ function getSetupKey(interaction) {
 }
 
 async function handleLoggingRoleSelect(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
     const selectedRoleIds = interaction.values;
     const key = getSetupKey(interaction);
 
@@ -388,13 +391,16 @@ async function handleLoggingRoleSelect(interaction) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return interaction.update({
+    return safeReply(interaction, {
         embeds: [embed],
         components: [row]
     }).catch(() => null);
 }
 
 async function handleFullSetupRoleSelect(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
     const selectedRoleIds = interaction.values;
     const key = getSetupKey(interaction);
 
@@ -441,7 +447,7 @@ async function handleFullSetupRoleSelect(interaction) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return interaction.update({
+    return safeReply(interaction, {
         embeds: [embed],
         components: [row]
     }).catch(() => null);
@@ -2119,11 +2125,10 @@ async function handleApplicationPositionModal(interaction) {
             .setMaxValues(1)
     );
 
-    return interaction.reply({
+    return safeReply(interaction, {
         embeds: [embed],
-        components: [roleRow],
-        ephemeral: true
-    }).catch(() => null);
+        components: [roleRow]
+    }, true).catch(() => null);
 }
 
 async function handleApplicationPositionRoleSelect(interaction) {
@@ -2181,7 +2186,10 @@ async function handleApplicationPositionRoleSelect(interaction) {
             .setStyle(ButtonStyle.Success)
     );
 
-    return interaction.update({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         embeds: [embed],
         components: [row]
     }).catch(() => null);
@@ -2312,17 +2320,13 @@ async function handleSendApplicationPanelFromSetup(interaction) {
 
 async function handleSetupButton(interaction) {
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({
-            content: '❌ Only server administrators can use the setup wizard.',
-            ephemeral: true
-        }).catch(() => null);
+        return safeReply(interaction, {
+            content: '❌ Only server administrators can use the setup wizard.'
+        }, true).catch(() => null);
     }
 
-    if (interaction.customId === 'setup_back') {
-        return interaction.update({
-            embeds: [buildSetupMainEmbed(interaction)],
-            components: buildSetupMainComponents()
-        }).catch(() => null);
+    if (interaction.customId === 'setup_applications_add_position') {
+        return handleApplicationAddPositionButton(interaction);
     }
 
     if (interaction.customId === 'setup_logging_confirm') {
@@ -2335,6 +2339,40 @@ async function handleSetupButton(interaction) {
 
     if (interaction.customId === 'setup_tickets_auto') {
         return handleAutoTicketSetup(interaction);
+    }
+
+    if (interaction.customId === 'setup_automod_basic') {
+        return handleAutomodPreset(interaction, 'basic');
+    }
+
+    if (interaction.customId === 'setup_automod_recommended') {
+        return handleAutomodPreset(interaction, 'recommended');
+    }
+
+    if (interaction.customId === 'setup_automod_aggressive') {
+        return handleAutomodPreset(interaction, 'aggressive');
+    }
+
+    if (interaction.customId === 'setup_welcome_auto') {
+        return handleAutoWelcomeSetup(interaction);
+    }
+
+    if (interaction.customId === 'setup_applications_auto') {
+        return handleAutoApplicationSetup(interaction);
+    }
+
+    if (interaction.customId === 'setup_applications_finish') {
+        return handleSendApplicationPanelFromSetup(interaction);
+    }
+
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    if (interaction.customId === 'setup_back') {
+        return safeReply(interaction, {
+            embeds: [buildSetupMainEmbed(interaction)],
+            components: buildSetupMainComponents()
+        });
     }
 
     if (interaction.customId === 'setup_automod_advanced') {
@@ -2359,38 +2397,10 @@ async function handleSetupButton(interaction) {
             .setFooter({ text: 'Infinity Bot • AutoMod Advanced Setup ⚡' })
             .setTimestamp();
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [buildBackButton()]
-        }).catch(() => null);
-    }
-
-    if (interaction.customId === 'setup_automod_basic') {
-        return handleAutomodPreset(interaction, 'basic');
-    }
-
-    if (interaction.customId === 'setup_automod_recommended') {
-        return handleAutomodPreset(interaction, 'recommended');
-    }
-
-    if (interaction.customId === 'setup_automod_aggressive') {
-        return handleAutomodPreset(interaction, 'aggressive');
-    }
-
-    if (interaction.customId === 'setup_welcome_auto') {
-        return handleAutoWelcomeSetup(interaction);
-    }
-
-    if (interaction.customId === 'setup_applications_auto') {
-        return handleAutoApplicationSetup(interaction);
-    }
-
-    if (interaction.customId === 'setup_applications_add_position') {
-        return handleApplicationAddPositionButton(interaction);
-    }
-
-    if (interaction.customId === 'setup_applications_finish') {
-        return handleSendApplicationPanelFromSetup(interaction);
+        });
     }
 
     const type = interaction.customId.replace('setup_', '');
@@ -2439,19 +2449,19 @@ async function handleSetupButton(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [row]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'diagnose') {
         const embed = await buildDiagnoseEmbed(interaction);
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [buildBackButton()]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'logging') {
@@ -2496,10 +2506,10 @@ async function handleSetupButton(interaction) {
 
         const backRow = buildBackButton();
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [roleRow, backRow]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'welcome') {
@@ -2549,10 +2559,10 @@ async function handleSetupButton(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [row]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'applications') {
@@ -2602,10 +2612,10 @@ async function handleSetupButton(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [row]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'automod') {
@@ -2779,10 +2789,10 @@ async function handleSetupButton(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [row1, row2]
-        }).catch(() => null);
+        });
     }
 
     if (type === 'full') {
@@ -2815,10 +2825,10 @@ async function handleSetupButton(interaction) {
                 .setMaxValues(10)
         );
 
-        return interaction.update({
+        return safeReply(interaction, {
             embeds: [embed],
             components: [roleRow, buildBackButton()]
-        }).catch(() => null);
+        });
     }
 
     const pages = {
@@ -2865,10 +2875,9 @@ async function handleSetupButton(interaction) {
     const page = pages[type];
 
     if (!page) {
-        return interaction.reply({
-            content: '❌ Unknown setup option.',
-            ephemeral: true
-        }).catch(() => null);
+        return safeReply(interaction, {
+            content: '❌ Unknown setup option.'
+        }, true);
     }
 
     const embed = new EmbedBuilder()
@@ -2882,10 +2891,10 @@ async function handleSetupButton(interaction) {
         .setFooter({ text: 'Infinity Bot • Setup Wizard ⚡' })
         .setTimestamp();
 
-    return interaction.update({
+    return safeReply(interaction, {
         embeds: [embed],
         components: [buildBackButton()]
-    }).catch(() => null);
+    });
 }
 
 module.exports = {

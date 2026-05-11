@@ -8,7 +8,7 @@ const {
     TextInputStyle
 } = require('discord.js');
 const { pool } = require('../database');
-const { safeReply } = require('../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../handlers/interactions/safeReply');
 
 function reply(interaction, payload, ephemeral = true) {
     return safeReply(interaction, payload, ephemeral);
@@ -205,7 +205,8 @@ async function handleCreateApplication(interaction, positionId) {
 }
 
 async function handleApplicationModal(interaction, positionId) {
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const settings = await getApplicationSettings(interaction.guild.id);
 
@@ -476,7 +477,8 @@ async function handleDenyApplication(interaction, applicationId) {
 }
 
 async function handleDenyApplicationModal(interaction, applicationId) {
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const [rows] = await pool.query(
         `SELECT *

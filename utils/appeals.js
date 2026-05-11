@@ -13,12 +13,14 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../database');
+
 const {
     getCaseByNumber,
     getAppealableCasesForUser,
     deleteWarningByCase
 } = require('./moderationDb');
-const { safeReply } = require('../handlers/interactions/safeReply');
+
+const { safeReply, safeDefer, safeDeferUpdate } = require('../handlers/interactions/safeReply');
 
 function reply(interaction, payload, ephemeral = true) {
     return safeReply(interaction, payload, ephemeral);
@@ -223,10 +225,7 @@ async function createAppealTicket({
         throw new Error('Invalid appeal category configured.');
     }
 
-    const channelName = `appeal-${appeal.id}-${user.username}`
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, '')
-        .slice(0, 25);
+    const channelName = `appeal-${appeal.id}`;
 
     const tempChannel = await guild.channels.create({
         name: channelName || `appeal-${appeal.id}`,
@@ -436,7 +435,8 @@ async function handleAppealGuildSelect(interaction) {
 }
 
 async function handleAppealCaseSelect(interaction, guildId) {
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const caseNumber = interaction.values[0];
 
@@ -554,7 +554,8 @@ async function updateAppealTicketMessage(interaction, appeal) {
 }
 
 async function handleAppealModal(interaction, guildId, caseNumber) {
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const appealReason = interaction.fields.getTextInputValue('appeal_reason')?.trim();
 
@@ -573,7 +574,12 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
         }, true);
     }
 
-    const existingAppeal = await getAppealByCase(guildId, Number(caseNumber), interaction.user.id);
+    const existingAppeal = await getAppealByCase(
+        guildId,
+        caseData.id,
+        interaction.user.id
+    );
+
     if (existingAppeal) {
         return reply(interaction, {
             content: '❌ You have already submitted an appeal for that case.'
@@ -592,6 +598,7 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
 
     const appealId = await createAppealRecord({
         guildId,
+        caseId: caseData.id,
         caseNumber: Number(caseNumber),
         userId: interaction.user.id,
         moderatorId: caseData.moderator_id,
@@ -623,9 +630,16 @@ async function handleAppealModal(interaction, guildId, caseNumber) {
 
 async function handleClaimAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
+
     if (!appeal) {
         return reply(interaction, {
             content: '❌ Appeal not found.',
+        }, true);
+    }
+
+    if (!interaction.guild || !interaction.member) {
+        return reply(interaction, {
+            content: '❌ This action can only be used inside the appeal server.'
         }, true);
     }
 
@@ -637,18 +651,28 @@ async function handleClaimAppeal(interaction, appealId) {
         }, true);
     }
 
-    if (appeal.claimed_by) {
-        return reply(interaction, {
-            content: `❌ This appeal has already been claimed by <@${appeal.claimed_by}>.`,
-        }, true);
-    }
-
-    await pool.query(
+    const [result] = await pool.query(
         `UPDATE appeals
          SET claimed_by = ?, claimed_at = ?, status = 'claimed'
-         WHERE id = ?`,
+         WHERE id = ?
+           AND claimed_by IS NULL
+           AND status NOT IN ('approved', 'denied', 'closed')`,
         [interaction.user.id, Date.now(), appealId]
     );
+
+    if (!result.affectedRows) {
+        const latestAppeal = await getAppealById(appealId);
+
+        if (latestAppeal?.claimed_by) {
+            return reply(interaction, {
+                content: `❌ This appeal has already been claimed by <@${latestAppeal.claimed_by}>.`,
+            }, true);
+        }
+
+        return reply(interaction, {
+            content: '❌ This appeal is already closed or decided.',
+        }, true);
+    }
 
     const updatedAppeal = await getAppealById(appealId);
     await updateAppealTicketMessage(interaction, updatedAppeal);
@@ -660,9 +684,16 @@ async function handleClaimAppeal(interaction, appealId) {
 
 async function handleApproveAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
+
     if (!appeal) {
         return reply(interaction, {
             content: '❌ Appeal not found.',
+        }, true);
+    }
+
+    if (!interaction.guild || !interaction.member) {
+        return reply(interaction, {
+            content: '❌ This action can only be used inside the appeal server.'
         }, true);
     }
 
@@ -694,9 +725,16 @@ async function handleApproveAppeal(interaction, appealId) {
 
 async function handleDenyAppeal(interaction, appealId) {
     const appeal = await getAppealById(appealId);
+
     if (!appeal) {
         return reply(interaction, {
             content: '❌ Appeal not found.',
+        }, true);
+    }
+
+    if (!interaction.guild || !interaction.member) {
+        return reply(interaction, {
+            content: '❌ This action can only be used inside the appeal server.'
         }, true);
     }
 
@@ -785,12 +823,20 @@ async function applyApprovedAppeal(interaction, appeal) {
 }
 
 async function handleAppealDecisionModal(interaction, appealId, decision) {
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const appeal = await getAppealById(appealId);
+
     if (!appeal) {
         return reply(interaction, {
             content: '❌ Appeal not found.'
+        }, true);
+    }
+
+    if (!interaction.guild || !interaction.member) {
+        return reply(interaction, {
+            content: '❌ This action can only be used inside the appeal server.'
         }, true);
     }
 
@@ -810,10 +856,11 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
 
     const decisionReason = interaction.fields.getTextInputValue('decision_reason')?.trim();
 
-    await pool.query(
+    const [result] = await pool.query(
         `UPDATE appeals
-         SET status = ?, decision = ?, decision_reason = ?, decided_by = ?, decided_at = ?
-         WHERE id = ?`,
+     SET status = ?, decision = ?, decision_reason = ?, decided_by = ?, decided_at = ?
+     WHERE id = ?
+       AND status NOT IN ('approved', 'denied', 'closed')`,
         [
             decision,
             decision,
@@ -823,6 +870,12 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
             appealId
         ]
     );
+
+    if (!result.affectedRows) {
+        return reply(interaction, {
+            content: '❌ This appeal is already closed or decided.'
+        }, true);
+    }
 
     const updatedAppeal = await getAppealById(appealId);
 
@@ -871,7 +924,7 @@ async function handleAppealDecisionModal(interaction, appealId, decision) {
 
     await updateAppealTicketMessage(interaction, updatedAppeal);
 
-    await interaction.editReply({
+    await safeReply(interaction, {
         embeds: [
             new EmbedBuilder()
                 .setColor(decision === 'approved' ? '#00ff88' : '#ff4d4d')
@@ -973,6 +1026,9 @@ async function getOpenAppealRelayByChannel(channelId) {
 
 async function relayAppealDmMessage(message) {
     if (message.author.bot) return false;
+    if (message.webhookId) return false;
+    if (message.system) return false;
+
     if (!message.content?.trim() && !message.attachments?.size) return false;
 
     const relay = await getOpenAppealRelayByUser(message.client, message.author.id);
@@ -1000,6 +1056,9 @@ async function relayAppealDmMessage(message) {
 async function relayAppealStaffMessage(message) {
     if (!message.guild) return false;
     if (message.author.bot) return false;
+    if (message.webhookId) return false;
+    if (message.system) return false;
+
     if (!message.content?.trim() && !message.attachments?.size) return false;
     if (message.content.startsWith('!') || message.content.startsWith('/')) return false;
 
@@ -1041,6 +1100,9 @@ async function buildAppealTranscript(channel) {
         if (!fetched.size) break;
 
         allMessages.push(...fetched.values());
+
+        if (allMessages.length >= 5000) break;
+
         lastId = fetched.last().id;
 
         if (fetched.size < 100) break;
@@ -1080,9 +1142,9 @@ async function sendAppealLog({
     const settings = await getTicketSettings(appeal.guild_id);
 
     const transcriptChannel = settings?.appeal_transcript_channel_id
-    ? interaction.guild.channels.cache.get(settings.appeal_transcript_channel_id) ||
-      await interaction.guild.channels.fetch(settings.appeal_transcript_channel_id).catch(() => null)
-    : null;
+        ? interaction.guild.channels.cache.get(settings.appeal_transcript_channel_id) ||
+        await interaction.guild.channels.fetch(settings.appeal_transcript_channel_id).catch(() => null)
+        : null;
 
     if (!transcriptChannel) return null;
 
@@ -1135,6 +1197,12 @@ async function handleCloseAppeal(interaction, appealId) {
         }, true);
     }
 
+    if (!interaction.guild || !interaction.member) {
+        return reply(interaction, {
+            content: '❌ This action can only be used inside the appeal server.'
+        }, true);
+    }
+
     const settings = await getTicketSettings(appeal.guild_id);
 
     if (!isAppealStaff(interaction.member, settings)) {
@@ -1149,22 +1217,32 @@ async function handleCloseAppeal(interaction, appealId) {
         }, true);
     }
 
-    await interaction.update({
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
+
+    await safeReply(interaction, {
         content: '🔒 Closing appeal relay in 5 seconds...',
         components: [],
         embeds: []
     }).catch(() => null);
 
-    await pool.query(
+    const [result] = await pool.query(
         `UPDATE appeals
      SET status = 'closed',
          decision = 'closed',
          decision_reason = 'Appeal relay closed by staff.',
          decided_by = ?,
          decided_at = ?
-     WHERE id = ?`,
+     WHERE id = ?
+       AND status NOT IN ('closed', 'approved', 'denied')`,
         [interaction.user.id, Date.now(), appealId]
     );
+
+    if (!result.affectedRows) {
+        return safeReply(interaction, {
+            content: '❌ This appeal is already closed or decided.'
+        }, true);
+    }
 
     const user = await interaction.client.users.fetch(appeal.user_id).catch(() => null);
 

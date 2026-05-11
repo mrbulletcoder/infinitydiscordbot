@@ -1,6 +1,8 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { pool } = require('../../database');
 
+const { safeReply, safeDeferUpdate } = require('./safeReply');
+
 function formatDuration(ms) {
     const seconds = Math.floor(ms / 1000);
     if (seconds < 60) return `${seconds}s`;
@@ -143,7 +145,8 @@ async function applyRule(interaction, type, offense, action, duration, mode) {
     const guildId = interaction.guild.id;
     const offenseNumber = Number(offense);
 
-    await interaction.deferUpdate();
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
 
     if (mode === 'delete') {
         await pool.query(
@@ -177,7 +180,7 @@ async function applyRule(interaction, type, offense, action, duration, mode) {
         filterRules
     );
 
-    return interaction.editReply({
+    return safeReply(interaction, {
         content: `✅ Rule ${mode === 'delete' ? 'deleted' : 'updated'} successfully.`,
         embeds: [embed],
         components: [createAutomodMainButtons()]
@@ -194,15 +197,14 @@ async function handleAutomodModeButton(interaction) {
             { label: 'Spam Protection', value: 'spam', emoji: '🚫', description: 'Configure spam offense punishments' },
             { label: 'Link Protection', value: 'links', emoji: '🔗', description: 'Configure link offense punishments' },
             { label: 'Invite Protection', value: 'invites', emoji: '📨', description: 'Block Discord invite links' },
-            { label: 'Caps Protection', value: 'caps', emoji: '🔊', description: 'Configure caps offense punishments' },          
+            { label: 'Caps Protection', value: 'caps', emoji: '🔊', description: 'Configure caps offense punishments' },
             { label: 'Word Filter', value: 'filter', emoji: '🚫', description: 'Block filtered words and phrases' },
         ]);
 
-    return interaction.reply({
+    return safeReply(interaction, {
         embeds: [createAutomodSetupEmbed(`You selected **${mode}** mode.\n\nChoose which protection category you want to configure.`)],
         components: [new ActionRowBuilder().addComponents(menu)],
-        ephemeral: true
-    });
+    }, true);
 }
 
 async function handleAutomodProtectionSelect(interaction) {
@@ -218,8 +220,10 @@ async function handleAutomodProtectionSelect(interaction) {
             description: `Configure punishment for offense #${i + 1}`
         })));
 
-    await interaction.deferUpdate();
-    return interaction.editReply({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         embeds: [createAutomodSetupEmbed(`**Protection Type:** \`${type}\`\n**Mode:** \`${mode}\`\n\nNow choose which offense level you want to configure.`)],
         components: [new ActionRowBuilder().addComponents(offenseMenu)]
     });
@@ -242,8 +246,10 @@ async function handleAutomodOffenseSelect(interaction) {
             { label: 'Kick', value: 'kick', emoji: '👢', description: 'Kick the user from the server' }
         ]);
 
-    await interaction.deferUpdate();
-    return interaction.editReply({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         embeds: [createAutomodSetupEmbed(`**Protection Type:** \`${type}\`\n**Offense:** \`#${offense}\`\n**Mode:** \`${mode}\`\n\nChoose the punishment for this offense.`)],
         components: [new ActionRowBuilder().addComponents(actionMenu)]
     });
@@ -267,8 +273,10 @@ async function handleAutomodActionSelect(interaction) {
                 { label: '10 Minutes', value: '600000', description: 'Long timeout' }
             ]);
 
-        await interaction.deferUpdate();
-        return interaction.editReply({
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        return safeReply(interaction, {
             embeds: [createAutomodSetupEmbed(`**Protection Type:** \`${type}\`\n**Offense:** \`#${offense}\`\n**Punishment:** \`timeout\`\n\nChoose the timeout duration.`)],
             components: [new ActionRowBuilder().addComponents(durationMenu)]
         });

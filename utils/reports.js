@@ -10,7 +10,7 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../database');
-const { safeReply } = require('../handlers/interactions/safeReply');
+const { safeReply, safeDefer } = require('../handlers/interactions/safeReply');
 
 function reply(interaction, payload, ephemeral = true) {
     return safeReply(interaction, payload, ephemeral);
@@ -369,7 +369,8 @@ async function handleResolveReportModal(interaction, reportId) {
         }, true);
     }
 
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const report = await getReportById(interaction.guild.id, reportId);
 
@@ -486,7 +487,8 @@ async function handleDismissReportModal(interaction, reportId) {
         }, true);
     }
 
-    await interaction.deferReply({ flags: 64 });
+    const deferred = await safeDefer(interaction, true);
+    if (!deferred) return;
 
     const report = await getReportById(interaction.guild.id, reportId);
 

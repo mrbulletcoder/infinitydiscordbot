@@ -1,5 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
+const { safeReply, safeDeferUpdate } = require('./safeReply');
+
 function getPingStatus(ping) {
     if (ping < 120) return { text: 'Excellent', emoji: '🟢' };
     if (ping < 250) return { text: 'Good', emoji: '🟡' };
@@ -32,8 +34,10 @@ function getMemoryUsage() {
 }
 
 async function handleRefreshPing(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
     const start = Date.now();
-    await interaction.deferUpdate();
     const end = Date.now();
 
     const apiLatency = end - start;
@@ -70,7 +74,10 @@ async function handleRefreshPing(interaction) {
             .setStyle(ButtonStyle.Primary)
     );
 
-    return interaction.editReply({ embeds: [embed], components: [row] });
+    return safeReply(interaction, {
+        embeds: [embed],
+        components: [row]
+    });
 }
 
 module.exports = { handleRefreshPing };

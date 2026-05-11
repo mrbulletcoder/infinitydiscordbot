@@ -176,6 +176,14 @@ CREATE TABLE IF NOT EXISTS automod_punishments (
   UNIQUE KEY unique_automod_punishment (guild_id, type, offense_number)
 );
 
+CREATE TABLE IF NOT EXISTS automod_filtered_words (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  guild_id VARCHAR(32) NOT NULL,
+  word VARCHAR(255) NOT NULL,
+  created_at BIGINT NULL,
+  UNIQUE KEY unique_filtered_word (guild_id, word)
+);
+
 CREATE TABLE IF NOT EXISTS automod_whitelist_roles (
   id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   guild_id VARCHAR(32) NOT NULL,

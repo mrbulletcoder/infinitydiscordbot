@@ -6,7 +6,7 @@ const {
 } = require('discord.js');
 
 const { pool } = require('../database');
-const { safeReply } = require('../handlers/interactions/safeReply');
+const { safeReply, safeDeferUpdate } = require('../handlers/interactions/safeReply');
 
 const activeGiveawayIntervals = new Map();
 
@@ -381,27 +381,27 @@ function checkGiveawayRequirements(member, giveaway) {
 async function handleGiveawayEnter(interaction) {
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Giveaway data could not be found.',
         }, true);
     }
 
     if (giveaway.ended || Date.now() >= giveaway.end_at) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ This giveaway has already ended.',
         }, true);
     }
 
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
     if (!member) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Could not verify your server membership.',
         }, true);
     }
 
     const requirementCheck = checkGiveawayRequirements(member, giveaway);
     if (!requirementCheck.ok) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: requirementCheck.message,
         }, true);
     }
@@ -409,7 +409,7 @@ async function handleGiveawayEnter(interaction) {
     const entries = safeParseEntries(giveaway.entries_json);
 
     if (entries.includes(interaction.user.id)) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You are already entered in this giveaway.',
         }, true);
     }
@@ -420,7 +420,7 @@ async function handleGiveawayEnter(interaction) {
     const updatedGiveaway = await fetchGiveawayById(giveaway.id);
     await editGiveawayMessage(interaction.client, updatedGiveaway).catch(() => null);
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ You have entered **${updatedGiveaway.prize}**. Good luck!`,
     }, true);
 }
@@ -428,14 +428,14 @@ async function handleGiveawayEnter(interaction) {
 async function handleGiveawayEntries(interaction) {
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Giveaway data could not be found.',
         }, true);
     }
 
     const entries = safeParseEntries(giveaway.entries_json);
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: entries.length
             ? `👥 **${giveaway.prize}** currently has **${entries.length}** entr${entries.length === 1 ? 'y' : 'ies'}.`
             : `👥 **${giveaway.prize}** currently has **0 entries**.`,
@@ -444,20 +444,20 @@ async function handleGiveawayEntries(interaction) {
 
 async function handleGiveawayEnd(interaction) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You need **Manage Server** to end giveaways.',
         }, true);
     }
 
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Giveaway data could not be found.',
         }, true);
     }
 
     if (giveaway.ended) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ This giveaway has already ended.',
         }, true);
     }
@@ -475,7 +475,7 @@ async function handleGiveawayEnd(interaction) {
             .setStyle(ButtonStyle.Secondary)
     );
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `⚠️ Are you sure you want to end **${giveaway.prize}** right now?`,
         components: [row],
     }, true);
@@ -483,7 +483,7 @@ async function handleGiveawayEnd(interaction) {
 
 async function handleGiveawayConfirmEnd(interaction, giveawayId) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You need **Manage Server** to end giveaways.',
         }, true);
     }
@@ -491,20 +491,29 @@ async function handleGiveawayConfirmEnd(interaction, giveawayId) {
     const result = await endGiveaway(interaction.client, giveawayId, false);
 
     if (!result.ok && result.reason === 'already_ended') {
-        return interaction.update({
+        const deferred = await safeDeferUpdate(interaction);
+        if (!deferred) return;
+
+        return safeReply(interaction, {
             content: '❌ This giveaway has already ended.',
             components: []
         });
     }
 
-    return interaction.update({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         content: `✅ Giveaway ended for **${result.giveaway.prize}**.`,
         components: []
     });
 }
 
 async function handleGiveawayCancelEnd(interaction) {
-    return interaction.update({
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    return safeReply(interaction, {
         content: '✅ Giveaway end cancelled.',
         components: []
     });
@@ -512,27 +521,27 @@ async function handleGiveawayCancelEnd(interaction) {
 
 async function handleGiveawayReroll(interaction) {
     if (!interaction.memberPermissions?.has('ManageGuild')) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ You need **Manage Server** to reroll giveaways.',
         }, true);
     }
 
     const giveaway = await fetchGiveawayByMessage(interaction.message.id);
     if (!giveaway) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ Giveaway data could not be found.',
         }, true);
     }
 
     if (!giveaway.ended) {
-        return reply(interaction,{
+        return reply(interaction, {
             content: '❌ End the giveaway before rerolling it.',
         }, true);
     }
 
     await endGiveaway(interaction.client, giveaway.id, true);
 
-    return reply(interaction,{
+    return reply(interaction, {
         content: `✅ Giveaway rerolled for **${giveaway.prize}**.`,
     }, true);
 }
