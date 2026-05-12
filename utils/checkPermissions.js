@@ -79,16 +79,7 @@ async function safeReplyMessage(message, payload) {
 }
 
 async function safeReplyInteraction(interaction, payload) {
-    try {
-        if (interaction.replied || interaction.deferred) {
-            return await interaction.followUp(payload);
-        }
-
-        return await interaction.reply(payload);
-    } catch (error) {
-        console.error('Failed to send permission reply to interaction:', error);
-        return null;
-    }
+    return safeReply(interaction, payload, true);
 }
 
 async function denyPrefix(message, permission) {

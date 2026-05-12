@@ -150,6 +150,14 @@ async function handleCreateTicket(interaction) {
             }, true);
         }
 
+        let supportRole = null;
+
+        if (settings.support_role_id) {
+            supportRole =
+                interaction.guild.roles.cache.get(settings.support_role_id) ||
+                await interaction.guild.roles.fetch(settings.support_role_id).catch(() => null);
+        }
+
         const tempChannel = await interaction.guild.channels.create({
             name: `ticket-${interaction.user.username}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20),
             type: ChannelType.GuildText,
@@ -169,8 +177,8 @@ async function handleCreateTicket(interaction) {
                         PermissionFlagsBits.EmbedLinks
                     ]
                 },
-                ...(settings.support_role_id ? [{
-                    id: settings.support_role_id,
+                ...(supportRole ? [{
+                    id: supportRole.id,
                     allow: [
                         PermissionFlagsBits.ViewChannel,
                         PermissionFlagsBits.SendMessages,
@@ -243,7 +251,7 @@ async function handleCreateTicket(interaction) {
             .setTimestamp();
 
         await tempChannel.send({
-            content: `${interaction.user}${settings.support_role_id ? ` <@&${settings.support_role_id}>` : ''}`,
+            content: `${interaction.user}${supportRole ? ` <@&${supportRole.id}>` : ''}`,
             embeds: [embed],
             components: [buildTicketButtons(ticketId)]
         });

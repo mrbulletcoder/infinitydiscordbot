@@ -1,3 +1,4 @@
+const { MessageFlags } = require('discord.js');
 const { error, warn } = require('./consoleLogger');
 
 function generateErrorId() {
@@ -57,13 +58,13 @@ async function replyWithError(interactionOrMessage, errorId) {
             if (interactionOrMessage.deferred || interactionOrMessage.replied) {
                 return await interactionOrMessage.followUp({
                     content,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
             return await interactionOrMessage.reply({
                 content,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     } catch (replyError) {
