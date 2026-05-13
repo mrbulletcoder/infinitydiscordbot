@@ -2,10 +2,13 @@ const {
     EmbedBuilder,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 
 const { pool } = require('../database');
+
+const { notifySetupIssue } = require('../utils/setupNotifier');
 
 const defaultWelcome = {
     channel: null,
@@ -56,14 +59,103 @@ module.exports = {
             const channel = member.guild.channels.cache.get(settings.channel)
                 || await member.guild.channels.fetch(settings.channel).catch(() => null);
 
-            if (!channel) return;
+            if (!channel) {
+                await notifySetupIssue(member.guild, {
+                    system: 'Welcome System',
+                    issueCode: 'missing_welcome_channel',
+                    title: 'Welcome Channel Missing',
+                    description:
+                        'Infinity tried to send a welcome message, but the configured welcome channel no longer exists.',
+                    fix:
+                        'Run `/setwelcomeconfig` again and choose a valid welcome channel.',
+                    severity: 'warning'
+                });
+
+                return;
+            }
+
+            const me = member.guild.members.me ||
+                await member.guild.members.fetchMe().catch(() => null);
+
+            const channelPerms = channel.permissionsFor(me);
+
+            if (!channelPerms?.has([
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.EmbedLinks
+            ])) {
+                console.warn(`Cannot send welcome message in ${member.guild.name} #${channel.name}: Missing permissions.`);
+
+                await notifySetupIssue(member.guild, {
+                    system: 'Welcome System',
+                    issueCode: 'welcome_channel_permissions',
+                    title: 'Welcome Channel Permissions Missing',
+                    description:
+                        `Infinity cannot send welcome messages in ${channel}.`,
+                    fix:
+                        'Give Infinity these permissions in the welcome channel:\n' +
+                        '• View Channel\n' +
+                        '• Send Messages\n' +
+                        '• Embed Links',
+                    severity: 'danger'
+                });
+
+                return;
+            }
 
             if (settings.autoRole) {
-                const role = member.guild.roles.cache.get(settings.autoRole);
+                const role =
+                    member.guild.roles.cache.get(settings.autoRole) ||
+                    await member.guild.roles.fetch(settings.autoRole).catch(() => null);
 
-                if (role) {
+                const me = member.guild.members.me ||
+                    await member.guild.members.fetchMe().catch(() => null);
+
+                if (!role) {
+                    console.warn(`Welcome auto-role no longer exists in ${member.guild.name}: ${settings.autoRole}`);
+
+                    await notifySetupIssue(member.guild, {
+                        system: 'Welcome System',
+                        issueCode: 'missing_welcome_auto_role',
+                        title: 'Welcome Auto-Role Missing',
+                        description:
+                            'Infinity could not assign the configured welcome role because that role no longer exists.',
+                        fix:
+                            'Run `/setwelcomeconfig` again and choose a valid auto-role, or remove the auto-role setting.',
+                        severity: 'warning'
+                    });
+
+                } else if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                    console.warn(`Cannot assign welcome role in ${member.guild.name}: Missing Manage Roles permission.`);
+
+                    await notifySetupIssue(member.guild, {
+                        system: 'Welcome System',
+                        issueCode: 'missing_manage_roles',
+                        title: 'Missing Manage Roles Permission',
+                        description:
+                            `Infinity cannot assign the welcome role ${role} because it does not have **Manage Roles** permission.`,
+                        fix:
+                            'Give Infinity the Manage Roles permission in Server Settings → Roles.',
+                        severity: 'danger'
+                    });
+
+                } else if (me.roles.highest.position <= role.position) {
+                    console.warn(`Cannot assign welcome role "${role.name}" in ${member.guild.name}: Bot role is too low.`);
+
+                    await notifySetupIssue(member.guild, {
+                        system: 'Welcome System',
+                        issueCode: 'bot_role_too_low',
+                        title: 'Bot Role Is Too Low',
+                        description:
+                            `Infinity cannot assign ${role} because the Infinity role is below that role.`,
+                        fix:
+                            'Move the Infinity bot role above the welcome auto-role in Server Settings → Roles.',
+                        severity: 'danger'
+                    });
+
+                } else {
                     await member.roles.add(role).catch(err => {
-                        console.log('Role assign error:', err.message);
+                        console.warn(`Role assign error in ${member.guild.name}: ${err.message}`);
                     });
                 }
             }

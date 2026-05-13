@@ -5,10 +5,12 @@ const {
     ButtonStyle,
     ModalBuilder,
     TextInputBuilder,
-    TextInputStyle
+    TextInputStyle,
+    PermissionFlagsBits
 } = require('discord.js');
 const { pool } = require('../database');
 const { safeReply, safeDefer } = require('../handlers/interactions/safeReply');
+const { notifySetupIssue } = require('./setupNotifier');
 
 function reply(interaction, payload, ephemeral = true) {
     return safeReply(interaction, payload, ephemeral);
@@ -116,6 +118,15 @@ async function handleCreateApplication(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'applications_not_configured',
+            title: 'Applications System Not Configured',
+            description: 'A user tried to submit an application, but the applications system is missing required settings.',
+            fix: 'Run `/setup` → Applications, or run `/applicationconfig` again and choose a valid panel and review channel.',
+            severity: 'warning'
+        });
+
         return reply(interaction, {
             content: '❌ The applications system is not configured yet.',
         }, true);
@@ -124,6 +135,15 @@ async function handleCreateApplication(interaction, positionId) {
     const position = await getApplicationPosition(interaction.guild.id, positionId);
 
     if (!position) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'application_position_missing',
+            title: 'Application Position Missing',
+            description: 'A user tried to apply for a staff position that no longer exists or has been disabled.',
+            fix: 'Run `/setup` → Applications and add a valid staff position again.',
+            severity: 'warning'
+        });
+
         return reply(interaction, {
             content: '❌ That application position could not be found or is disabled.',
         }, true);
@@ -211,6 +231,15 @@ async function handleApplicationModal(interaction, positionId) {
     const settings = await getApplicationSettings(interaction.guild.id);
 
     if (!settings?.review_channel_id) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'applications_not_configured',
+            title: 'Applications System Not Configured',
+            description: 'A user tried to submit an application, but the applications system is missing required settings.',
+            fix: 'Run `/setup` → Applications, or run `/applicationconfig` again and choose a valid panel and review channel.',
+            severity: 'warning'
+        });
+
         return reply(interaction, {
             content: '❌ The applications system is not configured yet.',
         }, true);
@@ -219,6 +248,15 @@ async function handleApplicationModal(interaction, positionId) {
     const position = await getApplicationPosition(interaction.guild.id, positionId);
 
     if (!position) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'application_position_missing',
+            title: 'Application Position Missing',
+            description: 'A user submitted an application for a staff position that no longer exists or has been disabled.',
+            fix: 'Run `/setup` → Applications and add a valid staff position again.',
+            severity: 'warning'
+        });
+
         return reply(interaction, {
             content: '❌ That application position could not be found or is disabled.',
         }, true);
@@ -249,6 +287,50 @@ async function handleApplicationModal(interaction, positionId) {
         }, true);
     }
 
+    const reviewChannel =
+        interaction.guild.channels.cache.get(settings.review_channel_id) ||
+        await interaction.guild.channels.fetch(settings.review_channel_id).catch(() => null);
+
+    if (!reviewChannel) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'application_review_channel_missing',
+            title: 'Application Review Channel Missing',
+            description: 'Infinity could not send a submitted application because the configured review channel no longer exists.',
+            fix: 'Run `/setup` → Applications, or run `/applicationconfig` again and choose a valid review channel.',
+            severity: 'warning'
+        });
+
+        return reply(interaction, {
+            content: '❌ The configured review channel could not be found.'
+        }, true);
+    }
+
+    const reviewPerms = reviewChannel.permissionsFor(interaction.guild.members.me);
+
+    if (!reviewPerms?.has([
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+    ])) {
+        await notifySetupIssue(interaction.guild, {
+            system: 'Applications System',
+            issueCode: 'application_review_permissions',
+            title: 'Application Review Channel Permissions Missing',
+            description: `Infinity could not send a submitted application in ${reviewChannel}.`,
+            fix:
+                'Give Infinity these permissions in the application review channel:\n' +
+                '• View Channel\n' +
+                '• Send Messages\n' +
+                '• Embed Links',
+            severity: 'danger'
+        });
+
+        return reply(interaction, {
+            content: '❌ Infinity does not have permission to send applications to the review channel.'
+        }, true);
+    }
+
     const answers = {
         age: interaction.fields.getTextInputValue('age'),
         experience: interaction.fields.getTextInputValue('experience'),
@@ -272,16 +354,6 @@ async function handleApplicationModal(interaction, positionId) {
     );
 
     const applicationId = insertResult.insertId;
-
-    const reviewChannel =
-        interaction.guild.channels.cache.get(settings.review_channel_id) ||
-        await interaction.guild.channels.fetch(settings.review_channel_id).catch(() => null);
-
-    if (!reviewChannel) {
-        return reply(interaction, {
-            content: '❌ The configured review channel could not be found.'
-        }, true);
-    }
 
     const embed = new EmbedBuilder()
         .setAuthor({

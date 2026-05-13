@@ -1,4 +1,5 @@
-const { safeRun } = require('./safeReply');
+const { PermissionFlagsBits } = require('discord.js');
+const { safeRun, safeReply } = require('./safeReply');
 const { runReportButtonAction } = require('./reportActionGuard');
 const { handleRefreshPing } = require('./pingHandler');
 const { handleAutomodModeButton } = require('./automodInteractionHandler');
@@ -41,8 +42,202 @@ const {
     handleCloseAppeal
 } = require('../../utils/appeals');
 
+const {
+    pendingEmbeds,
+    buildEmbed,
+    buildLinkButtons
+} = require('../../commands/admin/embed');
+
+const {
+    serverPages,
+    buildServersEmbed,
+    buildServersButtons
+} = require('../../commands/admin/servers');
+
 async function handleButton(interaction) {
     const { customId } = interaction;
+
+    if (
+        customId === 'servers_prev' ||
+        customId === 'servers_next' ||
+        customId.startsWith('servers_invite_')
+    ) {
+        return safeRun(interaction, `button ${customId}`, async () => {
+            const key = `${interaction.user.id}:${interaction.guild.id}`;
+            const data = serverPages.get(key);
+
+            if (!data) {
+                return safeReply(interaction, {
+                    content: '❌ This server list has expired. Please run `/servers` again.'
+                }, true);
+            }
+
+            if (customId === 'servers_prev') {
+                data.page = Math.max(0, data.page - 1);
+
+                serverPages.set(key, data);
+
+                return interaction.update({
+                    embeds: [buildServersEmbed(interaction, data)],
+                    components: buildServersButtons(data)
+                }).catch(() => null);
+            }
+
+            if (customId === 'servers_next') {
+                const totalPages = Math.max(1, Math.ceil(data.guilds.length / 5));
+
+                data.page = Math.min(totalPages - 1, data.page + 1);
+
+                serverPages.set(key, data);
+
+                return interaction.update({
+                    embeds: [buildServersEmbed(interaction, data)],
+                    components: buildServersButtons(data)
+                }).catch(() => null);
+            }
+
+            if (customId.startsWith('servers_invite_')) {
+                const index = Number(customId.replace('servers_invite_', ''));
+                const guildIndex = data.page * 5 + index;
+                const guildData = data.guilds[guildIndex];
+
+                if (!guildData) {
+                    return safeReply(interaction, {
+                        content: '❌ That server could not be found on this page.'
+                    }, true);
+                }
+
+                const guild = interaction.client.guilds.cache.get(guildData.id);
+
+                if (!guild) {
+                    return safeReply(interaction, {
+                        content: '❌ I am no longer in that server.'
+                    }, true);
+                }
+
+                const inviteChannel = guild.channels.cache.find(channel =>
+                    channel.isTextBased?.() &&
+                    channel.permissionsFor(guild.members.me)?.has([
+                        PermissionFlagsBits.ViewChannel,
+                        PermissionFlagsBits.CreateInstantInvite
+                    ])
+                );
+
+                if (!inviteChannel) {
+                    return safeReply(interaction, {
+                        content: `❌ I could not create an invite for **${guild.name}**. Missing invite permissions.`
+                    }, true);
+                }
+
+                const invite = await inviteChannel.createInvite({
+                    maxAge: 300,
+                    maxUses: 1,
+                    unique: true,
+                    reason: 'Owner requested invite from /servers command'
+                });
+
+                return safeReply(interaction, {
+                    content: `🔗 Invite for **${guild.name}**:\n${invite.url}`
+                }, true);
+            }
+        });
+    }
+
+    if (customId.startsWith('embed_confirm_')) {
+        return safeRun(interaction, `button ${customId}`, async () => {
+
+            const embedId = interaction.customId.replace('embed_confirm_', '');
+            const data = pendingEmbeds.get(embedId);
+
+            if (!data) {
+                return interaction.update({
+                    content: '❌ This embed preview has expired. Please run `/embed` again.',
+                    embeds: [],
+                    components: []
+                }).catch(() => null);
+            }
+
+            if (interaction.user.id !== data.userId) {
+                return safeReply(interaction, {
+                    content: '❌ Only the admin who created this preview can send it.'
+                }, true).catch(() => null);
+            }
+
+            const channel = interaction.guild.channels.cache.get(data.channelId)
+                || await interaction.guild.channels.fetch(data.channelId).catch(() => null);
+
+            if (!channel) {
+                pendingEmbeds.delete(embedId);
+
+                return interaction.update({
+                    content: '❌ The target channel no longer exists.',
+                    embeds: [],
+                    components: []
+                }).catch(() => null);
+            }
+
+            if (!channel.permissionsFor(interaction.guild.members.me).has([
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.EmbedLinks
+            ])) {
+                return interaction.update({
+                    content: `❌ I no longer have permission to send embeds in ${channel}.`,
+                    embeds: [],
+                    components: []
+                }).catch(() => null);
+            }
+
+            const embed = buildEmbed(data, interaction);
+            const linkRows = buildLinkButtons(data);
+
+            const messagePayload = {
+                embeds: [embed],
+                components: linkRows,
+                allowedMentions: {
+                    parse: data.ping === '@everyone' || data.ping === '@here'
+                        ? ['everyone']
+                        : []
+                }
+            };
+
+            if (data.ping && data.ping !== 'none') {
+                messagePayload.content = data.ping;
+            }
+
+            await channel.send(messagePayload);
+
+            pendingEmbeds.delete(embedId);
+
+            return interaction.update({
+                content: `✅ Embed sent successfully in ${channel}.`,
+                embeds: [],
+                components: []
+            }).catch(() => null);
+        });
+    }
+
+    if (customId.startsWith('embed_cancel_')) {
+        return safeRun(interaction, `button ${customId}`, async () => {
+
+            const embedId = interaction.customId.replace('embed_cancel_', '');
+            const data = pendingEmbeds.get(embedId);
+
+            if (data && interaction.user.id !== data.userId) {
+                return safeReply(interaction, {
+                    content: '❌ Only the admin who created this preview can cancel it.'
+                }, true).catch(() => null);
+            }
+
+            pendingEmbeds.delete(embedId);
+
+            return interaction.update({
+                content: '❌ Embed cancelled.',
+                embeds: [],
+                components: []
+            }).catch(() => null);
+        });
+    }
 
     if (customId.startsWith('highlow_')) {
         return safeRun(interaction, `button ${customId}`, () => handleHighLowButton(interaction));

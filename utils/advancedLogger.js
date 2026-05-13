@@ -1,6 +1,7 @@
 const { EmbedBuilder, PermissionFlagsBits, ChannelType, AuditLogEvent } = require('discord.js');
 const { pool } = require('../database');
 const { safeReply } = require('../handlers/interactions/safeReply');
+const { notifySetupIssue } = require('./setupNotifier');
 
 const BRAND_COLOR = '#00bfff';
 const SUCCESS_COLOR = '#57f287';
@@ -198,14 +199,63 @@ function isIgnored(settings, channelId) {
 
 async function getLogChannel(guild, category, sourceChannelId = null) {
     const settings = await getLogSettings(guild.id);
+
     if (!Number(settings.enabled)) return null;
     if (sourceChannelId && isIgnored(settings, sourceChannelId)) return null;
 
-    const channelId = settings[COLUMNS[category]] || settings.moderation_logs || settings.server_logs || settings.message_logs;
-    if (!channelId) return null;
+    const column = COLUMNS[category];
+    if (!column) return null;
 
-    const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
-    if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) return null;
+    const channelId = settings[column];
+
+    if (!channelId) {
+        await notifySetupIssue(guild, {
+            system: 'Logging System',
+            issueCode: `logging_${category}_channel_not_set`,
+            title: `${CATEGORY_LABELS[category] || 'Log'} Channel Not Set`,
+            description:
+                `Infinity tried to send a **${CATEGORY_LABELS[category] || category}** entry, but no channel is configured for this log category.`,
+            fix:
+                `Run \`/logging setup\` and choose a valid channel for **${CATEGORY_LABELS[category] || category}**.`,
+            severity: 'warning'
+        });
+
+        return null;
+    }
+
+    const channel =
+        guild.channels.cache.get(channelId) ||
+        await guild.channels.fetch(channelId).catch(() => null);
+
+    if (!channel) {
+        await notifySetupIssue(guild, {
+            system: 'Logging System',
+            issueCode: `logging_${category}_channel_missing`,
+            title: `${CATEGORY_LABELS[category] || 'Log'} Channel Missing`,
+            description:
+                `Infinity tried to send a **${CATEGORY_LABELS[category] || category}** entry, but the configured log channel no longer exists.`,
+            fix:
+                `Run \`/logging setup\` again and choose a valid channel for **${CATEGORY_LABELS[category] || category}**.`,
+            severity: 'warning'
+        });
+
+        return null;
+    }
+
+    if (![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) {
+        await notifySetupIssue(guild, {
+            system: 'Logging System',
+            issueCode: `logging_${category}_invalid_channel_type`,
+            title: `${CATEGORY_LABELS[category] || 'Log'} Channel Invalid`,
+            description:
+                `Infinity tried to send a **${CATEGORY_LABELS[category] || category}** entry, but the configured channel is not a text or announcement channel.`,
+            fix:
+                `Run \`/logging setup\` again and choose a normal text channel or announcement channel.`,
+            severity: 'warning'
+        });
+
+        return null;
+    }
 
     const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
     const permissions = me ? channel.permissionsFor(me) : null;
@@ -215,6 +265,20 @@ async function getLogChannel(guild, category, sourceChannelId = null) {
         !permissions?.has(PermissionFlagsBits.SendMessages) ||
         !permissions?.has(PermissionFlagsBits.EmbedLinks)
     ) {
+        await notifySetupIssue(guild, {
+            system: 'Logging System',
+            issueCode: `logging_${category}_permissions`,
+            title: `${CATEGORY_LABELS[category] || 'Log'} Permissions Missing`,
+            description:
+                `Infinity cannot send **${CATEGORY_LABELS[category] || category}** entries in ${channel}.`,
+            fix:
+                'Give Infinity these permissions in the configured log channel:\n' +
+                '• View Channel\n' +
+                '• Send Messages\n' +
+                '• Embed Links',
+            severity: 'danger'
+        });
+
         return null;
     }
 

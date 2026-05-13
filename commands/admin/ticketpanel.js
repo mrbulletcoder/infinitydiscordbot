@@ -10,6 +10,8 @@ const { pool } = require('../../database');
 
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
+const { buildTicketPanelEmbed } = require('../../utils/tickets');
+
 module.exports = {
     name: 'ticketpanel',
     description: 'Send the ticket creation panel.',
@@ -30,7 +32,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         try {
             const [rows] = await pool.query(
                 `SELECT panel_channel_id
@@ -69,24 +71,7 @@ module.exports = {
                 }, true);
             }
 
-            const embed = new EmbedBuilder()
-                .setAuthor({
-                    name: '🎫 Infinity Support Center',
-                    iconURL: interaction.guild.iconURL({ dynamic: true }) || undefined
-                })
-                .setColor('#00bfff')
-                .setDescription(
-                    '## Need Help?\n\n' +
-                    'Click the button below to create a **private support ticket**.\n' +
-                    'Our support team will assist you as soon as possible.\n\n' +
-                    '━━━━━━━━━━━━━━━━━━━━━━\n' +
-                    '🛠️ **Support:** Private help from staff\n' +
-                    '🔒 **Privacy:** Only you and staff can view it\n' +
-                    '⚡ **Fast Access:** Get help quickly and cleanly\n' +
-                    '━━━━━━━━━━━━━━━━━━━━━━'
-                )
-                .setFooter({ text: 'Infinity Tickets' })
-                .setTimestamp();
+            const embed = buildTicketPanelEmbed(interaction);
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()

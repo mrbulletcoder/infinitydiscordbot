@@ -8,6 +8,8 @@ const {
     block
 } = require('../utils/advancedLogger');
 
+const { pool } = require('../database');
+
 function channelTypeName(channel) {
     return channel.type === 0 ? 'Text Channel'
         : channel.type === 2 ? 'Voice Channel'
@@ -23,6 +25,19 @@ module.exports = {
     async execute(channel) {
         try {
             if (!channel.guild) return;
+
+            await pool.query(
+                `UPDATE tickets
+     SET status = 'closed', closed_at = ?
+     WHERE guild_id = ? AND channel_id = ? AND status = 'open'`,
+                [
+                    Date.now(),
+                    channel.guild.id,
+                    channel.id
+                ]
+            ).catch(error => {
+                console.error('Failed to close deleted ticket channel in database:', error);
+            });
 
             await new Promise(resolve => setTimeout(resolve, 1200));
 

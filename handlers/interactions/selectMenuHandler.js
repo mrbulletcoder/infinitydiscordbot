@@ -19,6 +19,8 @@ const {
 const {
     handleLoggingRoleSelect,
     handleFullSetupRoleSelect,
+    handleFullSetupSupportRoleSelect,
+    handleTicketSupportRoleSelect,
     handleApplicationPositionRoleSelect
 } = require('./setupMenuHandler');
 
@@ -74,6 +76,18 @@ async function handleStringSelectMenu(interaction) {
     if (customId === 'setup_full_roles') {
         return safeRun(interaction, `select ${customId}`, () =>
             handleFullSetupRoleSelect(interaction)
+        );
+    }
+
+    if (customId === 'setup_full_support_role') {
+        return safeRun(interaction, `select ${customId}`, () =>
+            handleFullSetupSupportRoleSelect(interaction)
+        );
+    }
+
+    if (customId === 'setup_ticket_support_role') {
+        return safeRun(interaction, `select ${customId}`, () =>
+            handleTicketSupportRoleSelect(interaction)
         );
     }
 }

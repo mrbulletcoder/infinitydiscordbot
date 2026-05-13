@@ -10,6 +10,8 @@ const {
 const { pool } = require('../database');
 const { safeReply, safeDefer, safeDeferUpdate } = require('../handlers/interactions/safeReply');
 
+const { notifySetupIssue } = require('./setupNotifier');
+
 const createCooldown = new Map();
 
 function reply(interaction, payload, ephemeral = true) {
@@ -92,6 +94,27 @@ function buildTicketName(ticketId, username) {
     return `ticket-${ticketId}-${cleanUser}`;
 }
 
+function buildTicketPanelEmbed(interaction) {
+    return new EmbedBuilder()
+        .setColor('#00bfff')
+        .setAuthor({
+            name: '🎫 Infinity Support Center',
+            iconURL: interaction.client.user.displayAvatarURL()
+        })
+        .setTitle('Need Help?')
+        .setDescription(
+            'Click the button below to create a **private support ticket**.\n' +
+            'Our support team will assist you as soon as possible.\n\n' +
+            '━━━━━━━━━━━━━━━━━━━━━━\n' +
+            '🛠️ **Support:** Private help from staff\n' +
+            '🔒 **Privacy:** Only you and staff can view it\n' +
+            '⚡ **Fast Access:** Get help quickly and cleanly\n' +
+            '━━━━━━━━━━━━━━━━━━━━━━'
+        )
+        .setFooter({ text: 'Infinity Bot • Support Center ⚡' })
+        .setTimestamp();
+}
+
 async function handleCreateTicket(interaction) {
     try {
         const deferred = await safeDefer(interaction, true);
@@ -112,22 +135,41 @@ async function handleCreateTicket(interaction) {
         const settings = await getTicketSettings(interaction.guild.id);
 
         if (!settings?.category_id || !settings?.transcript_channel_id) {
+            await notifySetupIssue(interaction.guild, {
+                system: 'Ticket System',
+                issueCode: 'ticket_system_not_configured',
+                title: 'Ticket System Not Configured',
+                description:
+                    'A user tried to create a ticket, but the ticket system is missing required setup settings.',
+                fix:
+                    'Run `/setup` → Tickets, or run `/ticketconfig` again and choose a valid category, panel channel, transcript channel, and support role.',
+                severity: 'warning'
+            });
+
             return reply(interaction, {
                 content: '❌ The ticket system is not configured yet.'
             }, true);
         }
 
         const existing = await getOpenTicketByUser(interaction.guild.id, interaction.user.id);
+
         if (existing) {
             const existingChannel =
                 interaction.guild.channels.cache.get(existing.channel_id) ||
                 await interaction.guild.channels.fetch(existing.channel_id).catch(() => null);
 
-            return reply(interaction, {
-                content: existingChannel
-                    ? `❌ You already have an open ticket: ${existingChannel}`
-                    : '❌ You already have an open ticket.'
-            }, true);
+            if (existingChannel) {
+                return reply(interaction, {
+                    content: `❌ You already have an open ticket: ${existingChannel}`
+                }, true);
+            }
+
+            await pool.query(
+                `UPDATE tickets
+         SET status = 'closed', closed_at = ?
+         WHERE id = ?`,
+                [Date.now(), existing.id]
+            );
         }
 
         const category =
@@ -135,6 +177,17 @@ async function handleCreateTicket(interaction) {
             await interaction.guild.channels.fetch(settings.category_id).catch(() => null);
 
         if (!category || category.type !== ChannelType.GuildCategory) {
+            await notifySetupIssue(interaction.guild, {
+                system: 'Ticket System',
+                issueCode: 'ticket_category_missing',
+                title: 'Ticket Category Missing',
+                description:
+                    'Infinity could not create a ticket because the configured ticket category no longer exists or is invalid.',
+                fix:
+                    'Run `/setup` → Tickets, or run `/ticketconfig` again and choose a valid ticket category.',
+                severity: 'warning'
+            });
+
             return reply(interaction, {
                 content: '❌ The configured ticket category is invalid.'
             }, true);
@@ -145,6 +198,19 @@ async function handleCreateTicket(interaction) {
 
         if (!categoryPerms?.has(PermissionFlagsBits.ViewChannel) ||
             !categoryPerms?.has(PermissionFlagsBits.ManageChannels)) {
+            await notifySetupIssue(interaction.guild, {
+                system: 'Ticket System',
+                issueCode: 'ticket_category_permissions',
+                title: 'Ticket Category Permissions Missing',
+                description:
+                    `Infinity cannot create ticket channels inside the configured ticket category.`,
+                fix:
+                    'Give Infinity these permissions in the ticket category:\n' +
+                    '• View Channel\n' +
+                    '• Manage Channels',
+                severity: 'danger'
+            });
+
             return reply(interaction, {
                 content: '❌ I do not have permission to create ticket channels in the ticket category. I need **View Channel** and **Manage Channels**.'
             }, true);
@@ -156,6 +222,19 @@ async function handleCreateTicket(interaction) {
             supportRole =
                 interaction.guild.roles.cache.get(settings.support_role_id) ||
                 await interaction.guild.roles.fetch(settings.support_role_id).catch(() => null);
+
+            if (!supportRole) {
+                await notifySetupIssue(interaction.guild, {
+                    system: 'Ticket System',
+                    issueCode: 'ticket_support_role_missing',
+                    title: 'Ticket Support Role Missing',
+                    description:
+                        'Infinity could not mention or give ticket access to the configured support role because that role no longer exists.',
+                    fix:
+                        'Run `/setup` → Tickets, or run `/ticketconfig` again and choose a valid support role.',
+                    severity: 'warning'
+                });
+            }
         }
 
         const tempChannel = await interaction.guild.channels.create({
@@ -455,9 +534,16 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
             (settings?.support_role_id && interaction.member.roles.cache.has(settings.support_role_id));
 
         const ticket = await getTicketByChannel(interaction.guild.id, interaction.channel.id);
+
         if (!ticket || String(ticket.id) !== String(ticketId)) {
             return reply(interaction, {
                 content: '❌ This ticket record could not be found.',
+            }, true);
+        }
+
+        if (ticket.status === 'closed') {
+            return reply(interaction, {
+                content: '❌ This ticket is already closing or has already been closed.'
             }, true);
         }
 
@@ -466,6 +552,13 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
                 content: '❌ Only staff or the ticket creator can close this ticket.',
             }, true);
         }
+
+        await pool.query(
+            `UPDATE tickets
+     SET status = 'closed', closed_at = ?
+     WHERE id = ?`,
+            [Date.now(), ticket.id]
+        );
 
         const transcriptText = await buildTranscript(interaction.channel);
         const transcriptBuffer = Buffer.from(transcriptText || 'No transcript data.', 'utf8');
@@ -518,27 +611,59 @@ async function handleCloseTicketConfirm(interaction, ticketId) {
             await interaction.guild.channels.fetch(settings.transcript_channel_id).catch(() => null)
             : null;
 
-        if (transcriptChannel) {
-            await transcriptChannel.send({
-                embeds: [transcriptEmbed],
-                files: [transcriptAttachment]
+        if (!transcriptChannel) {
+            await notifySetupIssue(interaction.guild, {
+                system: 'Ticket System',
+                issueCode: 'ticket_transcript_channel_missing',
+                title: 'Ticket Transcript Channel Missing',
+                description:
+                    'Infinity closed a ticket, but could not send the transcript because the configured transcript channel no longer exists.',
+                fix:
+                    'Run `/setup` → Tickets, or run `/ticketconfig` again and choose a valid transcript channel.',
+                severity: 'warning'
             });
-        }
+        } else {
+            const transcriptPerms = transcriptChannel.permissionsFor(interaction.guild.members.me);
 
-        await pool.query(
-            `UPDATE tickets
-             SET status = 'closed', closed_at = ?
-             WHERE id = ?`,
-            [Date.now(), ticket.id]
-        );
+            if (!transcriptPerms?.has([
+                PermissionFlagsBits.ViewChannel,
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.EmbedLinks,
+                PermissionFlagsBits.AttachFiles
+            ])) {
+                await notifySetupIssue(interaction.guild, {
+                    system: 'Ticket System',
+                    issueCode: 'ticket_transcript_permissions',
+                    title: 'Ticket Transcript Permissions Missing',
+                    description:
+                        `Infinity closed a ticket, but could not send the transcript in ${transcriptChannel}.`,
+                    fix:
+                        'Give Infinity these permissions in the transcript channel:\n' +
+                        '• View Channel\n' +
+                        '• Send Messages\n' +
+                        '• Embed Links\n' +
+                        '• Attach Files',
+                    severity: 'danger'
+                });
+            } else {
+                await transcriptChannel.send({
+                    embeds: [transcriptEmbed],
+                    files: [transcriptAttachment]
+                });
+            }
+        }
 
         await safeReply(interaction, {
             content: '🔒 Ticket closed. This channel will be deleted in 5 seconds.',
             flags: 64
         }).catch(() => null);
 
+        const channelToDelete = interaction.channel;
+
         setTimeout(async () => {
-            await interaction.channel.delete().catch(() => null);
+            if (!channelToDelete || channelToDelete.deleted) return;
+
+            await channelToDelete.delete().catch(() => null);
         }, 5000);
     } catch (error) {
         console.error('handleCloseTicketConfirm error:', error);
@@ -571,5 +696,6 @@ module.exports = {
     handleClaimTicket,
     handleCloseTicket,
     handleCloseTicketConfirm,
-    handleCloseTicketCancel
+    handleCloseTicketCancel,
+    buildTicketPanelEmbed
 };

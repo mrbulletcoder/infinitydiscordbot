@@ -5,14 +5,14 @@
   "main": "index.js",
   "scripts": {
     "setup-db": "node scripts/setupDatabase.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "check": "node --check index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@napi-rs/canvas": "^0.1.97",
-    "chalk": "^5.6.2",
     "discord.js": "^14.25.1",
     "dotenv": "^17.3.1",
     "mysql2": "^3.20.0"

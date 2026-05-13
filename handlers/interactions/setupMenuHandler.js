@@ -20,8 +20,11 @@ const {
 
 const { safeDeferUpdate, safeReply } = require('./safeReply');
 
+const { buildTicketPanelEmbed } = require('../../utils/tickets');
+
 const pendingLoggingSetups = new Map();
 const pendingFullSetups = new Map();
+const pendingTicketSetups = new Map();
 const pendingApplicationPositions = new Map();
 
 function buildSetupMainEmbed(interaction) {
@@ -415,6 +418,56 @@ async function handleFullSetupRoleSelect(interaction) {
             name: 'Infinity Setup Wizard',
             iconURL: interaction.client.user.displayAvatarURL()
         })
+        .setTitle('🎫 Select Ticket Support Role')
+        .setDescription(
+            'Now select the support role that should be able to view and manage tickets.\n\n' +
+            '**Logging roles selected:**\n' +
+            selectedRoleIds.map(id => `• <@&${id}>`).join('\n')
+        )
+        .setFooter({ text: 'Infinity Bot • Full Setup Ticket Role ⚡' })
+        .setTimestamp();
+
+    const roleRow = new ActionRowBuilder().addComponents(
+        new RoleSelectMenuBuilder()
+            .setCustomId('setup_full_support_role')
+            .setPlaceholder('Select the ticket support role')
+            .setMinValues(1)
+            .setMaxValues(1)
+    );
+
+    return safeReply(interaction, {
+        embeds: [embed],
+        components: [roleRow, buildBackButton()]
+    }).catch(() => null);
+}
+
+async function handleFullSetupSupportRoleSelect(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    const supportRoleId = interaction.values[0];
+    const key = getSetupKey(interaction);
+    const pending = pendingFullSetups.get(key);
+
+    if (!pending?.roleIds?.length) {
+        return safeReply(interaction, {
+            content: '❌ No logging roles selected. Please restart Full Setup.',
+            components: [buildBackButton()]
+        });
+    }
+
+    pendingFullSetups.set(key, {
+        ...pending,
+        supportRoleId,
+        createdAt: Date.now()
+    });
+
+    const embed = new EmbedBuilder()
+        .setColor('#00bfff')
+        .setAuthor({
+            name: 'Infinity Setup Wizard',
+            iconURL: interaction.client.user.displayAvatarURL()
+        })
         .setTitle('🎯 Confirm Full Setup')
         .setDescription(
             'Infinity will automatically configure the main systems for your server.\n\n' +
@@ -425,9 +478,10 @@ async function handleFullSetupRoleSelect(interaction) {
             'Welcome System\n' +
             'Recommended AutoMod\n' +
             '```\n\n' +
-            '**Roles that can view logging channels:**\n' +
-            selectedRoleIds.map(id => `• <@&${id}>`).join('\n') +
+            '**Logging roles:**\n' +
+            pending.roleIds.map(id => `• <@&${id}>`).join('\n') +
             '\n\n' +
+            `**Ticket support role:** <@&${supportRoleId}>\n\n` +
             'Click **Start Full Setup** to continue.'
         )
         .setFooter({ text: 'Infinity Bot • Full Setup Confirmation ⚡' })
@@ -438,6 +492,57 @@ async function handleFullSetupRoleSelect(interaction) {
             .setCustomId('setup_full_confirm')
             .setLabel('Start Full Setup')
             .setEmoji('🚀')
+            .setStyle(ButtonStyle.Success),
+
+        new ButtonBuilder()
+            .setCustomId('setup_back')
+            .setLabel('Cancel')
+            .setEmoji('❌')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    return safeReply(interaction, {
+        embeds: [embed],
+        components: [row]
+    }).catch(() => null);
+}
+
+async function handleTicketSupportRoleSelect(interaction) {
+    const deferred = await safeDeferUpdate(interaction);
+    if (!deferred) return;
+
+    const supportRoleId = interaction.values[0];
+    const key = getSetupKey(interaction);
+
+    pendingTicketSetups.set(key, {
+        supportRoleId,
+        createdAt: Date.now()
+    });
+
+    const embed = new EmbedBuilder()
+        .setColor('#00bfff')
+        .setAuthor({
+            name: 'Infinity Setup Wizard',
+            iconURL: interaction.client.user.displayAvatarURL()
+        })
+        .setTitle('🎫 Confirm Ticket Setup')
+        .setDescription(
+            'Infinity will configure your ticket system using the support role you selected.\n\n' +
+            `**Support Role:** <@&${supportRoleId}>\n\n` +
+            '```yaml\n' +
+            'Category: Tickets\n' +
+            'Panel Channel: create-a-ticket\n' +
+            'Transcript Channel: ticket-transcripts\n' +
+            '```'
+        )
+        .setFooter({ text: 'Infinity Bot • Ticket Setup Confirmation ⚡' })
+        .setTimestamp();
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('setup_tickets_auto')
+            .setLabel('Start Ticket Setup')
+            .setEmoji('✅')
             .setStyle(ButtonStyle.Success),
 
         new ButtonBuilder()
@@ -652,14 +757,26 @@ async function handleAutoTicketSetup(interaction) {
     try {
         await updateSetupProgress(interaction, '🎫 Setting Up Tickets', steps, 0);
 
-        let staffRole =
-            guild.roles.cache.find(r => r.name.toLowerCase().trim() === 'support');
+        const key = getSetupKey(interaction);
+        const pending = pendingTicketSetups.get(key);
+
+        if (!pending?.supportRoleId) {
+            return safeReply(interaction, {
+                content: '❌ No support role selected. Please go back and select a support role first.',
+                components: [buildBackButton()]
+            });
+        }
+
+        pendingTicketSetups.delete(key);
+
+        const staffRole =
+            guild.roles.cache.get(pending.supportRoleId) ||
+            await guild.roles.fetch(pending.supportRoleId).catch(() => null);
 
         if (!staffRole) {
-            staffRole = await guild.roles.create({
-                name: 'Support',
-                color: 0x00bfff,
-                reason: 'Infinity setup wizard created staff role'
+            return safeReply(interaction, {
+                content: '❌ The selected support role no longer exists. Please select another role.',
+                components: [buildBackButton()]
             });
         }
 
@@ -755,15 +872,7 @@ async function handleAutoTicketSetup(interaction) {
             ]
         );
 
-        const embed = new EmbedBuilder()
-            .setColor('#00bfff')
-            .setAuthor({
-                name: '🎫 Infinity Support Center',
-                iconURL: interaction.client.user.displayAvatarURL()
-            })
-            .setDescription(
-                'Click the button below to create a support ticket.'
-            );
+        const embed = buildTicketPanelEmbed(interaction);
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -1280,9 +1389,27 @@ async function handleFullAutoSetup(interaction) {
         });
     }
 
+    if (!pending?.supportRoleId) {
+        return safeReply(interaction, {
+            content: '❌ No ticket support role selected. Please restart Full Setup and select a support role.',
+            components: [buildBackButton()]
+        });
+    }
+
     pendingFullSetups.delete(key);
 
     const allowedRoleIds = pending.roleIds;
+
+    const supportRole =
+        guild.roles.cache.get(pending.supportRoleId) ||
+        await guild.roles.fetch(pending.supportRoleId).catch(() => null);
+
+    if (!supportRole) {
+        return safeReply(interaction, {
+            content: '❌ The selected ticket support role no longer exists. Please restart Full Setup and choose another role.',
+            components: [buildBackButton()]
+        });
+    }
 
     await updateSetupProgress(interaction, '🎯 Running Full Setup', steps, 0);
 
@@ -1377,19 +1504,6 @@ async function handleFullAutoSetup(interaction) {
 
         await updateSetupProgress(interaction, '🎯 Running Full Setup', steps, 2);
 
-        // Ticket setup
-        let supportRole = guild.roles.cache.find(role =>
-            role.name.toLowerCase().trim() === 'support'
-        );
-
-        if (!supportRole) {
-            supportRole = await guild.roles.create({
-                name: 'Support',
-                color: 0x00bfff,
-                reason: 'Infinity full setup created support role'
-            });
-        }
-
         const ticketCategory = await createOrFindCategory('Tickets');
         const ticketPanel = await createOrFindChannel('create-a-ticket', ticketCategory.id);
         const ticketTranscripts = await createOrFindChannel('ticket-transcripts', ticketCategory.id);
@@ -1438,13 +1552,7 @@ async function handleFullAutoSetup(interaction) {
             ]
         );
 
-        const ticketEmbed = new EmbedBuilder()
-            .setColor('#00bfff')
-            .setAuthor({
-                name: '🎫 Infinity Support Center',
-                iconURL: interaction.client.user.displayAvatarURL()
-            })
-            .setDescription('Click the button below to create a support ticket.');
+        const ticketEmbed = buildTicketPanelEmbed(interaction);
 
         const ticketRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -1454,10 +1562,23 @@ async function handleFullAutoSetup(interaction) {
                 .setStyle(ButtonStyle.Primary)
         );
 
-        await ticketPanel.send({
-            embeds: [ticketEmbed],
-            components: [ticketRow]
-        }).catch(() => null);
+        const existingPanelMessages = await ticketPanel.messages.fetch({ limit: 20 }).catch(() => null);
+
+        const existingPanelMessage = existingPanelMessages?.find(message =>
+            message.author.id === interaction.client.user.id &&
+            message.components?.some(actionRow =>
+                actionRow.components?.some(component =>
+                    component.customId === 'ticket_create'
+                )
+            )
+        );
+
+        if (!existingPanelMessage) {
+            await ticketPanel.send({
+                embeds: [ticketEmbed],
+                components: [ticketRow]
+            }).catch(() => null);
+        }
 
         await updateSetupProgress(interaction, '🎯 Running Full Setup', steps, 3);
 
@@ -2414,44 +2535,32 @@ async function handleSetupButton(interaction) {
             })
             .setTitle('🎫 Ticket Setup')
             .setDescription(
-                'Infinity will automatically create or reuse your ticket system.\n\n' +
-                '**Auto Setup will configure:**\n' +
+                'Select the support role that should be able to view and manage tickets.\n\n' +
+                '**Infinity will configure:**\n' +
                 '```yaml\n' +
                 'Category: Tickets\n' +
                 'Channels:\n' +
                 '  - create-a-ticket\n' +
                 '  - ticket-transcripts\n' +
-                'Role:\n' +
-                '  - Support\n' +
+                'Support Role:\n' +
+                '  - Your selected role\n' +
                 '```\n\n' +
-                '**Permissions:**\n' +
-                '```yaml\n' +
-                '@everyone: Can create tickets\n' +
-                'Support: Can manage tickets\n' +
-                'ticket-transcripts: Hidden from everyone\n' +
-                '```\n\n' +
-                'Infinity will also send or reuse the ticket panel automatically.'
+                'Once selected, Infinity will automatically configure your ticket system.'
             )
             .setFooter({ text: 'Infinity Bot • Ticket Setup ⚡' })
             .setTimestamp();
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId('setup_tickets_auto')
-                .setLabel('Auto Setup')
-                .setEmoji('⚡')
-                .setStyle(ButtonStyle.Success),
-
-            new ButtonBuilder()
-                .setCustomId('setup_back')
-                .setLabel('Back')
-                .setEmoji('⬅️')
-                .setStyle(ButtonStyle.Secondary)
+        const roleRow = new ActionRowBuilder().addComponents(
+            new RoleSelectMenuBuilder()
+                .setCustomId('setup_ticket_support_role')
+                .setPlaceholder('Select the ticket support role')
+                .setMinValues(1)
+                .setMaxValues(1)
         );
 
         return safeReply(interaction, {
             embeds: [embed],
-            components: [row]
+            components: [roleRow, buildBackButton()]
         });
     }
 
@@ -2907,9 +3016,11 @@ module.exports = {
     handleApplicationAddPositionButton,
     handleApplicationPositionModal,
     handleApplicationPositionRoleSelect,
+    handleTicketSupportRoleSelect,
     handleSendApplicationPanelFromSetup,
     handleAutomodPreset,
     handleLoggingRoleSelect,
     handleFullSetupRoleSelect,
     handleFullAutoSetup,
+    handleFullSetupSupportRoleSelect,
 };

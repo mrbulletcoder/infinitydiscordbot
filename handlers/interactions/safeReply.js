@@ -31,7 +31,7 @@ async function safeReply(interaction, options, ephemeral = false) {
 
         return await interaction.reply(payload);
     } catch (error) {
-        if (error.code === 10062 || error.code === 40060) return null;
+        if ([10003, 10062, 40060].includes(error.code)) return null;
 
         console.error('Failed to send safe reply:', error);
         return null;
