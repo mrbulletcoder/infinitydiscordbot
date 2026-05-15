@@ -2,9 +2,21 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('disc
 const { getUser, removeWallet, addWallet, formatMoney } = require('../../utils/economy');
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
     }
 
     return ctx.reply(options);
@@ -61,11 +73,11 @@ async function pay(ctx, target, amount) {
     const sender = ctx.user || ctx.author;
 
     if (target.bot) {
-        return respond(ctx, { content: '❌ You cannot pay bots.' });
+        return respond(ctx, { content: '❌ You cannot pay bots.' }, true);
     }
 
     if (target.id === sender.id) {
-        return respond(ctx, { content: '❌ You cannot pay yourself.' });
+        return respond(ctx, { content: '❌ You cannot pay yourself.' }, true);
     }
 
     const guildId = ctx.guild.id;
@@ -74,7 +86,7 @@ async function pay(ctx, target, amount) {
     if (Number(senderData.wallet) < amount) {
         return respond(ctx, {
             content: `❌ You do not have enough money. Wallet: ${formatMoney(senderData.wallet)}`
-        });
+        }, true);
     }
 
     await removeWallet(guildId, sender.id, amount, 'pay_sent', `Paid ${target.id}`);
@@ -87,8 +99,8 @@ async function pay(ctx, target, amount) {
         .addFields(
             { name: 'Amount', value: formatMoney(amount), inline: true }
         )
-        .setFooter({ text: 'Infinity Economy System ⚡' })
+        .setFooter({ text: 'Infinity Economy System • Pay ⚡' })
         .setTimestamp();
 
-    return respond(ctx, { embeds: [embed] });
+    return publicResult(ctx, { embeds: [embed] });
 }

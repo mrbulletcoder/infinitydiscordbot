@@ -20,7 +20,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
 
@@ -42,9 +42,9 @@ module.exports = {
             .setColor('#ffaa00')
             .setTitle('🪙 You begged...')
             .setDescription(`Someone gave you **${formatMoney(amount)}**`)
-            .setFooter({ text: 'Infinity Economy System ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Beg ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

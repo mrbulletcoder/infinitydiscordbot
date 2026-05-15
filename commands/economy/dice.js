@@ -5,8 +5,23 @@ const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply'
 const MIN_BET = 100;
 const MAX_BET = 250000;
 
-function respond(ctx, options) {
-    if (ctx.user) return safeReply(ctx, options, true);
+function respond(ctx, options, ephemeral = false) {
+    if (ctx.user) {
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
+    }
+
     return ctx.reply(options);
 }
 
@@ -77,19 +92,19 @@ async function runDice(ctx, guess, bet) {
         if (!Number.isInteger(guess) || guess < 1 || guess > 6) {
             return respond(ctx, {
                 content: '❌ Your guess must be a number from **1** to **6**.'
-            });
+            }, true);
         }
 
         if (!Number.isInteger(bet) || bet < MIN_BET) {
             return respond(ctx, {
                 content: `❌ Minimum bet is **${formatMoney(MIN_BET)}**.`
-            });
+            }, true);
         }
 
         if (bet > MAX_BET) {
             return respond(ctx, {
                 content: `❌ Maximum bet is **${formatMoney(MAX_BET)}**.`
-            });
+            }, true);
         }
 
         const data = await getUser(guildId, userId);
@@ -97,8 +112,8 @@ async function runDice(ctx, guess, bet) {
 
         if (wallet < bet) {
             return respond(ctx, {
-                content: `❌ You do not have enough coins in your wallet.\nWallet: **${formatMoney(wallet)}**`
-            });
+                content: `❌ You do not have enough money.\nWallet: **${formatMoney(wallet)}**`
+            }, true);
         }
 
         const roll = Math.floor(Math.random() * 6) + 1;
@@ -129,28 +144,42 @@ async function runDice(ctx, guess, bet) {
                 iconURL: user.displayAvatarURL({ dynamic: true })
             })
             .setTitle(won ? '🎲 Dice Win!' : '🎲 Dice Lost')
-            .setDescription(
-                `You guessed **${guess}**.\n` +
-                `The dice rolled **${roll}** ${diceEmoji[roll]}\n\n` +
+            .addFields(
+                {
+                    name: '🎲 Dice Roll',
+                    value:
+                        `Your Guess: ${guess}\n` +
+                        `Dice Rolled: ${roll} ${diceEmoji[roll]}\n\u200b`,
+                    inline: false
+                },
 
-                `╭─ **🎲 DICE RESULT** ─╮\n` +
-                `│ 🎰 **Bet:** ${formatMoney(bet)}\n` +
-                `│ ${won ? '💰 **Profit:**' : '💸 **Lost:**'} ${won ? formatMoney(profit) : formatMoney(bet)}\n` +
-                `│ 🎯 **Guess:** ${guess}\n` +
-                `│ 🎲 **Roll:** ${roll} ${diceEmoji[roll]}\n` +
-                `│ 👛 **New Wallet:** ${formatMoney(won ? wallet + profit : wallet - bet)}\n` +
-                `╰──────────────────╯`
+                {
+                    name: '💰 Betting Information',
+                    value:
+                        `Bet Amount: ${formatMoney(bet)}\n` +
+                        `${won ? 'Profit' : 'Lost'}: ${won ? formatMoney(profit) : formatMoney(bet)}\n` +
+                        `Wallet Balance: ${formatMoney(won ? wallet + profit : wallet - bet)}\n\u200b`,
+                    inline: false
+                },
+
+                {
+                    name: '📈 Result',
+                    value: won
+                        ? '✅ Exact match! You won the dice roll.'
+                        : '❌ Wrong guess. Better luck next time.',
+                    inline: false
+                }
             )
             .setFooter({ text: 'Infinity Casino • Dice ⚡' })
             .setTimestamp();
 
-        return respond(ctx, { embeds: [embed] });
+        return publicResult(ctx, { embeds: [embed] });
 
     } catch (error) {
         console.error('Dice command error:', error);
 
         return respond(ctx, {
             content: '❌ Something went wrong while rolling the dice.'
-        });
+        }, true);
     }
 }

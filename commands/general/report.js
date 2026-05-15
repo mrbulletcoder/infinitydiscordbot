@@ -296,89 +296,77 @@ function buildReportEmbed({
     status = 'Open',
     claimedBy = null,
     handledBy = null,
-    decision = null
+    decision = null,
+    submittedAt = Date.now()
 }) {
+    const statusColor =
+        status === 'Resolved'
+            ? '#57f287'
+            : status === 'Dismissed'
+                ? '#ff4d4d'
+                : status === 'Claimed'
+                    ? '#ffaa00'
+                    : '#00bfff';
+
+    const submittedUnix = Math.floor(Number(submittedAt || Date.now()) / 1000);
+
     return new EmbedBuilder()
+        .setColor(statusColor)
         .setAuthor({
-            name: '🚨 Infinity Member Report',
+            name: 'Infinity • Member Report',
             iconURL: guild.iconURL({ dynamic: true }) || undefined
         })
-        .setColor(
-            status === 'Resolved'
-                ? '#00ff88'
-                : status === 'Dismissed'
-                    ? '#ff4d4d'
-                    : claimedBy
-                        ? '#ffaa00'
-                        : '#ff4d4d'
+        .setTitle(`🚨 Report Case #${caseNumber}`)
+        .setDescription(
+            decision
+                ? `**Final Decision:**\n> ${decision}`
+                : 'A member report has been submitted and is ready for staff review.'
         )
-        .setThumbnail(target.displayAvatarURL({ dynamic: true, size: 1024 }))
+        .setThumbnail(target?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null)
         .addFields(
             {
-                name: '📌 Report Information',
+                name: '📌 Report Details',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `**Case:** \`#${caseNumber}\`\n` +
-                    `**Report ID:** \`${reportId}\`\n` +
-                    `**Status:** \`${status}\``,
-                inline: true
+                    `Report ID: ${reportId}\n` +
+                    `Case: #${caseNumber}\n` +
+                    `Status: ${status}\n` +
+                    `Submitted: <t:${submittedUnix}:R>\n\u200b`,
+                inline: false
             },
+
             {
-                name: '👤 Reported User',
+                name: '👤 Reported Member',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${target.tag}\n` +
-                    `\`${target.id}\``,
-                inline: true
+                    `${target ? target.tag : 'Unknown User'}\n` +
+                    `${target?.id || 'Unknown ID'}\n\u200b`,
+                inline: false
             },
+
             {
                 name: '🧾 Reported By',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${reporter.tag}\n` +
-                    `\`${reporter.id}\``,
-                inline: true
+                    `${reporter ? reporter.tag : 'Unknown User'}\n` +
+                    `${reporter?.id || 'Unknown ID'}\n\u200b`,
+                inline: false
             },
+
             {
                 name: '📄 Reason',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${reason}`,
+                    `${String(reason || 'No reason provided.').slice(0, 1000)}\n\u200b`,
                 inline: false
             },
+
             {
-                name: '📅 Submitted',
+                name: '📍 Staff Status',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `<t:${Math.floor(Date.now() / 1000)}:F>\n<t:${Math.floor(Date.now() / 1000)}:R>`,
-                inline: true
-            },
-            {
-                name: '🛄 Claimed By',
-                value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    (claimedBy
-                        ? `${claimedBy.tag}\n\`${claimedBy.id}\``
-                        : '`Not claimed`'),
-                inline: true
-            },
-            {
-                name: '🛠️ Handled By',
-                value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    (handledBy
-                        ? `${handledBy.tag}\n\`${handledBy.id}\``
-                        : '`Not handled yet`'),
-                inline: true
+                    `Claimed By: ${claimedBy ? claimedBy.tag : 'Not claimed'}\n` +
+                    `Handled By: ${handledBy ? handledBy.tag : 'Not handled yet'}`,
+                inline: false
             }
         )
-        .setFooter({ text: 'Infinity Reports System' })
-        .setTimestamp()
-        .setDescription(
-            decision
-                ? `**Final Decision:** ${decision}`
-                : 'A member report has been submitted and is awaiting staff review.'
-        );
+        .setFooter({ text: 'Infinity Bot • Reports System ⚡' })
+        .setTimestamp();
 }
 
 function buildReporterSuccessEmbed(target, reason, caseNumber) {

@@ -17,7 +17,7 @@ module.exports = {
         .setDescription('View the economy shop'),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
         
         const items = getShopItems();
@@ -36,9 +36,9 @@ module.exports = {
                     inline: false
                 }))
             )
-            .setFooter({ text: 'Use /buy item:<id> to purchase an item ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Shop ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, false);
     }
 };

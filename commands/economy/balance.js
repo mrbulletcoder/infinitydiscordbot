@@ -2,9 +2,9 @@ const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('disc
 const { getUser, formatMoney } = require('../../utils/economy');
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
     }
 
     return ctx.reply(options);
@@ -36,7 +36,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
         
         const target = interaction.options.getUser('user') || interaction.user;
@@ -61,7 +61,7 @@ async function sendBalance(ctx, target) {
             { name: '🏦 Bank', value: formatMoney(data.bank), inline: true },
             { name: '💰 Net Worth', value: formatMoney(total), inline: true }
         )
-        .setFooter({ text: 'Infinity Economy System ⚡' })
+        .setFooter({ text: 'Infinity Economy System • Balance ⚡' })
         .setTimestamp();
 
     return respond(ctx, { embeds: [embed] });

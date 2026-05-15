@@ -6,9 +6,21 @@ const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply'
 const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
 const BASE_REWARD = 1000;
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
     }
 
     return ctx.reply(options);
@@ -53,7 +65,7 @@ async function claimDaily(ctx) {
     if (remaining > 0) {
         return respond(ctx, {
             content: `⏳ You already claimed your daily reward. Come back in **${formatTime(remaining)}**.`
-        });
+        }, true);
     }
 
     const streak = now - lastDaily <= DAILY_COOLDOWN * 2
@@ -84,5 +96,5 @@ async function claimDaily(ctx) {
         .setFooter({ text: 'Come back tomorrow for a bigger streak bonus ⚡' })
         .setTimestamp();
 
-    return respond(ctx, { embeds: [embed] });
+    return publicResult(ctx, { embeds: [embed] });
 }

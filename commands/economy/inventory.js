@@ -27,7 +27,7 @@ module.exports = {
         ),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
         
         const target = interaction.options.getUser('user') || interaction.user;
@@ -58,9 +58,9 @@ module.exports = {
                 iconURL: target.displayAvatarURL()
             })
             .setDescription(lines.join('\n\n').slice(0, 4096))
-            .setFooter({ text: 'Infinity Economy Inventory ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Inventory ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, false);
     }
 };

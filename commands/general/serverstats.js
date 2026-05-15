@@ -154,76 +154,78 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor('#00bfff')
-            .setTitle(`🏰 Infinity Server Intelligence`)
+            .setTitle('Server Stats')
             .setDescription(
-                `${serverBadge} **${guild.name}**\n` +
-                'A premium overview of this server’s structure, activity profile, boost level, and configuration.'
+                `**${guild.name}**\n` +
+                'A clean overview of this server’s members, channels, boosts, and settings.'
             )
             .setThumbnail(guild.iconURL({ dynamic: true, size: 1024 }))
             .addFields(
                 {
                     name: '👑 Server Overview',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Owner:** ${owner ? owner.user.tag : 'Unknown'}\n` +
-                        `**Server ID:** \`${guild.id}\`\n` +
-                        `**Created:** ${formatFullDate(guild.createdAt)}`,
+                        `Owner: ${owner ? owner.user.tag : 'Unknown'}\n` +
+                        `Server ID: ${guild.id}\n` +
+                        `Created: ${formatFullDate(guild.createdAt)}\n\u200b`,
                     inline: false
                 },
+
                 {
-                    name: '👥 Member Intelligence',
+                    name: '👥 Members',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Total Members:** \`${totalMembers}\`\n` +
-                        `**Humans:** \`${humans}\`\n` +
-                        `**Bots:** \`${bots}\`\n` +
-                        `**Composition:** ${getMemberComposition(totalMembers, humans, bots)}`,
-                    inline: true
+                        `Total Members: ${totalMembers}\n` +
+                        `Humans: ${humans}\n` +
+                        `Bots: ${bots}\n` +
+                        `Composition: Humans: ${((humans / totalMembers) * 100).toFixed(0)}% • Bots: ${((bots / totalMembers) * 100).toFixed(0)}%\n\u200b`,
+                    inline: false
                 },
+
                 {
-                    name: '💬 Channel System',
+                    name: '💬 Channels',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Text Channels:** \`${text}\`\n` +
-                        `**Voice Channels:** \`${voice}\`\n` +
-                        `**Categories:** \`${categories}\`\n` +
-                        `**Forums:** \`${forums}\``,
-                    inline: true
+                        `Text Channels: ${text}\n` +
+                        `Voice Channels: ${voice}\n` +
+                        `Categories: ${categories}\n` +
+                        `Forums: ${forums}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '🎭 Server Assets',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Roles:** \`${roles}\`\n` +
-                        `**Emojis:** \`${emojis}\`\n` +
-                        `**Stickers:** \`${stickers}\`\n` +
-                        `**Boost Tier:** \`${tier}\``,
-                    inline: true
+                        `Roles: ${roles}\n` +
+                        `Emojis: ${emojis}\n` +
+                        `Stickers: ${stickers}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '🚀 Boost Status',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Current Boosts:** \`${boosts}\`\n` +
-                        `**Tier Level:** \`${tier}\`\n` +
-                        `**Server Strength:** ${serverBadge} **${boosts >= 14 ? 'Elite' : boosts >= 7 ? 'High' : boosts >= 2 ? 'Growing' : 'Standard'}**`,
-                    inline: true
+                        `Current Boosts: ${boosts}\n` +
+                        `Tier Level: ${tier}\n` +
+                        `Server Strength: ${serverBadge} ${boosts >= 14 ? 'Elite' : boosts >= 7 ? 'High' : boosts >= 2 ? 'Growing' : 'Standard'}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '🛡️ Security Settings',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Verification:** \`${mapVerificationLevel(guild.verificationLevel)}\`\n` +
-                        `**Explicit Filter:** \`${mapExplicitContentFilter(guild.explicitContentFilter)}\`\n` +
-                        `**Notifications:** \`${mapDefaultNotifications(guild.defaultMessageNotifications)}\``,
-                    inline: true
+                        `Verification: ${mapVerificationLevel(guild.verificationLevel)}\n` +
+                        `Explicit Filter: ${mapExplicitContentFilter(guild.explicitContentFilter)}\n` +
+                        `Notifications: ${mapDefaultNotifications(guild.defaultMessageNotifications)}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '✨ Premium Features',
-                    value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `${features}`,
-                    inline: true
+                    value: guild.features?.length
+                        ? guild.features
+                            .slice(0, 8)
+                            .map(feature => `• ${formatFeature(feature)}`)
+                            .join('\n')
+                        : 'No special features enabled',
+                    inline: false
                 }
             )
             .setFooter({ text: 'Infinity Bot • Server Intelligence ⚡' })

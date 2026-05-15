@@ -17,8 +17,23 @@ const MAX_BET = 250000;
 
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 
-function respond(ctx, options) {
-    if (ctx.user) return safeReply(ctx, options, true);
+function respond(ctx, options, ephemeral = false) {
+    if (ctx.user) {
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
+    }
+
     return ctx.reply(options);
 }
 
@@ -124,33 +139,33 @@ async function runRoulette(ctx, choice, bet, chosenNumber = null) {
         if (!['red', 'black', 'green', 'even', 'odd', 'number'].includes(choice)) {
             return respond(ctx, {
                 content: '❌ Choose **red**, **black**, **green**, **even**, **odd**, or **number**.'
-            });
+            }, true);
         }
 
         if (!Number.isInteger(bet) || bet < MIN_BET) {
             return respond(ctx, {
                 content: `❌ Minimum bet is **${formatMoney(MIN_BET)}**.`
-            });
+            }, true);
         }
 
         if (bet > MAX_BET) {
             return respond(ctx, {
                 content: `❌ Maximum bet is **${formatMoney(MAX_BET)}**.`
-            });
+            }, true);
         }
 
         if (choice === 'number') {
             if (!Number.isInteger(chosenNumber) || chosenNumber < 0 || chosenNumber > 36) {
                 return respond(ctx, {
                     content: '❌ When betting on **number**, choose a number from **0** to **36**.'
-                });
+                }, true);
             }
         }
 
         if (choice !== 'number' && chosenNumber !== null) {
             return respond(ctx, {
                 content: '❌ The `number` option is only used when your choice is **Number**.'
-            });
+            }, true);
         }
 
         const data = await getUser(guildId, userId);
@@ -158,8 +173,8 @@ async function runRoulette(ctx, choice, bet, chosenNumber = null) {
 
         if (wallet < bet) {
             return respond(ctx, {
-                content: `❌ You do not have enough coins in your wallet.\nWallet: **${formatMoney(wallet)}**`
-            });
+                content: `❌ You do not have enough money.\nWallet: **${formatMoney(wallet)}**`
+            }, true);
         }
 
         const rolledNumber = Math.floor(Math.random() * 37);
@@ -221,28 +236,44 @@ async function runRoulette(ctx, choice, bet, chosenNumber = null) {
                 iconURL: user.displayAvatarURL({ dynamic: true })
             })
             .setTitle(won ? '🎰 Roulette Win!' : '🎰 Roulette Lost')
-            .setDescription(
-                `# ${colorEmoji} ${rolledNumber} ${rolledColor.toUpperCase()}\n\n` +
+            .addFields(
+                {
+                    name: '🎰 Roulette Spin',
+                    value:
+                        `Choice: ${displayChoice}\n` +
+                        `Rolled Number: ${rolledNumber}\n` +
+                        `Rolled Color: ${colorEmoji} ${rolledColor.toUpperCase()}\n\u200b`,
+                    inline: false
+                },
 
-                `╭─ **🎰 ROULETTE RESULT** ─╮\n` +
-                `│ 🎯 **Choice:** ${displayChoice}\n` +
-                `│ 🎲 **Rolled:** ${colorEmoji} ${rolledNumber} ${rolledColor.toUpperCase()}\n` +
-                `│ 🎰 **Bet:** ${formatMoney(bet)}\n` +
-                `│ ${won ? '💰 **Profit:**' : '💸 **Lost:**'} ${won ? formatMoney(profit) : formatMoney(bet)}\n` +
-                `│ 📈 **Multiplier:** x${multiplier}\n` +
-                `│ 👛 **New Wallet:** ${formatMoney(newWallet)}\n` +
-                `╰──────────────────────╯`
+                {
+                    name: '💰 Betting Information',
+                    value:
+                        `Bet Amount: ${formatMoney(bet)}\n` +
+                        `Multiplier: x${multiplier}\n` +
+                        `${won ? 'Profit' : 'Lost'}: ${won ? formatMoney(profit) : formatMoney(bet)}\n` +
+                        `Wallet Balance: ${formatMoney(newWallet)}\n\u200b`,
+                    inline: false
+                },
+
+                {
+                    name: '📈 Result',
+                    value: won
+                        ? '✅ Your roulette bet won!'
+                        : '❌ Your roulette bet lost.',
+                    inline: false
+                }
             )
             .setFooter({ text: 'Infinity Casino • Roulette ⚡' })
             .setTimestamp();
 
-        return respond(ctx, { embeds: [embed] });
+        return publicResult(ctx, { embeds: [embed] });
 
     } catch (error) {
         console.error('Roulette command error:', error);
 
         return respond(ctx, {
             content: '❌ Something went wrong while spinning roulette.'
-        });
+        }, true);
     }
 }

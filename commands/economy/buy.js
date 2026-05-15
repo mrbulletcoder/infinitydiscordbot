@@ -46,7 +46,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
         const itemId = interaction.options.getString('item', true);
@@ -66,7 +66,7 @@ module.exports = {
         if (Number(user.wallet) < totalCost) {
             return safeReply(interaction, {
                 content:
-                    `❌ You do not have enough money in your wallet.\n` +
+                    `❌ You do not have enough money.\n` +
                     `**Needed:** ${formatMoney(totalCost)}\n` +
                     `**Wallet:** ${formatMoney(user.wallet)}`
             }, true);
@@ -96,9 +96,9 @@ module.exports = {
                 { name: '💰 Total Cost', value: formatMoney(totalCost), inline: true },
                 { name: '🎒 Added To Inventory', value: `\`${quantity}x ${item.id}\``, inline: true }
             )
-            .setFooter({ text: 'Infinity Economy Shop ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Shop ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

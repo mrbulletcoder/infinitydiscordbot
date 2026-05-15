@@ -20,7 +20,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
 
@@ -57,8 +57,8 @@ module.exports = {
 
         await setCooldown(guildId, userId, 'last_crime');
 
-        embed.setFooter({ text: 'Infinity Economy System ⚡' }).setTimestamp();
+        embed.setFooter({ text: 'Infinity Economy System • Crime ⚡' }).setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

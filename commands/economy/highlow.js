@@ -25,9 +25,21 @@ const MAX_BET = 250000;
 
 const activeGames = new Map();
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
     }
 
     return ctx.reply(options);
@@ -56,6 +68,7 @@ function buildEmbed({
     wallet,
     bet,
     streak,
+    profit = null,
     finished = false,
     won = false,
     lost = false,
@@ -80,20 +93,48 @@ function buildEmbed({
                     ? '💥 HighLow Lost'
                     : '🎲 HighLow'
         )
-        .setDescription(
-            `${nextCard
-                ? `# 🃏 Revealed Card: ${cardName(nextCard)}\n\n`
-                : ''
-            }` +
+        .addFields(
+            {
+                name: '🃏 Current Card',
+                value:
+                    `${nextCard
+                        ? `Revealed Card: ${cardName(nextCard)}\n`
+                        : ''
+                    }` +
+                    `Current Card: ${cardName(currentCard)}\n\u200b`,
+                inline: false
+            },
 
-            `╭─ **🎲 HIGHLOW GAME** ─╮\n` +
-            `│ 🃏 **Current Card:** ${cardName(currentCard)}\n` +
-            `│ 🎰 **Bet:** ${formatMoney(bet)}\n` +
-            `│ 📈 **Multiplier:** x${multiplier.toFixed(2)}\n` +
-            `│ 🔥 **Streak:** ${streak}\n` +
-            `│ 💰 **Potential Win:** ${formatMoney(potential)}\n` +
-            `│ 👛 **Wallet:** ${formatMoney(wallet)}\n` +
-            `╰────────────────────╯`
+            {
+                name: '📈 Game Statistics',
+                value:
+                    `Multiplier: x${multiplier.toFixed(2)}\n` +
+                    `Win Streak: ${streak}\n` +
+                    `Potential Win: ${formatMoney(potential)}\n\u200b`,
+                inline: false
+            },
+
+            {
+                name: '💰 Betting Information',
+                value:
+                    `Bet Amount: ${formatMoney(bet)}\n` +
+                    `${won ? `Total Won: ${formatMoney(potential)}\n` : ''}` +
+                    `${won && profit !== null ? `Profit: ${formatMoney(profit)}\n` : ''}` +
+                    `${lost ? `Lost: ${formatMoney(bet)}\n` : ''}` +
+                    `Wallet Balance: ${formatMoney(wallet)}\n\u200b`,
+                inline: false
+            },
+
+            {
+                name: '📈 Status',
+                value:
+                    won
+                        ? '✅ You successfully cashed out!'
+                        : lost
+                            ? '❌ Wrong guess. Game over.'
+                            : 'Choose Higher, Lower, or Cash Out.',
+                inline: false
+            }
         )
         .setFooter({ text: 'Infinity Casino • HighLow ⚡' })
         .setTimestamp();
@@ -183,13 +224,13 @@ async function startGame(ctx, bet) {
         if (bet < MIN_BET) {
             return respond(ctx, {
                 content: `❌ Minimum bet is **${formatMoney(MIN_BET)}**.`
-            });
+            }, true);
         }
 
         if (bet > MAX_BET) {
             return respond(ctx, {
                 content: `❌ Maximum bet is **${formatMoney(MAX_BET)}**.`
-            });
+            }, true);
         }
 
         const data = await getUser(guildId, userId);
@@ -198,7 +239,7 @@ async function startGame(ctx, bet) {
         if (wallet < bet) {
             return respond(ctx, {
                 content: `❌ You only have **${formatMoney(wallet)}** in your wallet.`
-            });
+            }, true);
         }
 
         await removeWallet(
@@ -234,7 +275,7 @@ async function startGame(ctx, bet) {
             streak: game.streak
         });
 
-        return respond(ctx, {
+        return publicResult(ctx, {
             embeds: [embed],
             components: buildButtons(gameId, false, game.currentCard)
         });
@@ -244,7 +285,7 @@ async function startGame(ctx, bet) {
 
         return respond(ctx, {
             content: '❌ Failed to start HighLow game.'
-        });
+        }, true);
     }
 
 }
@@ -281,6 +322,7 @@ async function handleHighLowButton(interaction) {
         activeGames.delete(gameId);
 
         const winnings = Math.floor(game.bet * game.multiplier);
+        const profit = winnings - game.bet;
 
         await addWallet(
             game.guildId,
@@ -290,27 +332,18 @@ async function handleHighLowButton(interaction) {
             `Cashed out HighLow at x${game.multiplier.toFixed(2)}`
         );
 
-        const embed = new EmbedBuilder()
-            .setColor('#00ff99')
-            .setAuthor({
-                name: `${user.username}'s HighLow`,
-                iconURL: user.displayAvatarURL({ dynamic: true })
-            })
-            .setTitle('💰 HighLow Cashout!')
-            .setDescription(
-                `# 🎉 You Cashed Out!\n\n` +
-
-                `╭─ **💰 CASHOUT RESULT** ─╮\n` +
-                `│ 🃏 **Final Card:** ${cardName(game.currentCard)}\n` +
-                `│ 🎰 **Original Bet:** ${formatMoney(game.bet)}\n` +
-                `│ 📈 **Final Multiplier:** x${game.multiplier.toFixed(2)}\n` +
-                `│ 🔥 **Final Streak:** ${game.streak}\n` +
-                `│ 💵 **Total Won:** ${formatMoney(winnings)}\n` +
-                `│ 👛 **New Wallet:** ${formatMoney(wallet + winnings)}\n` +
-                `╰──────────────────────╯`
-            )
-            .setFooter({ text: 'Infinity Casino • HighLow ⚡' })
-            .setTimestamp();
+        const embed = buildEmbed({
+            user,
+            currentCard: game.currentCard,
+            multiplier: game.multiplier,
+            potential: winnings,
+            wallet: wallet + winnings,
+            bet: game.bet,
+            streak: game.streak,
+            profit,
+            finished: true,
+            won: true
+        });
 
         return safeReply(interaction, {
             embeds: [embed],

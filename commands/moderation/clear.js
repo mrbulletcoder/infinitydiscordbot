@@ -17,6 +17,18 @@ function formatUser(user) {
     return `${user.tag || user.username}\n\`${user.id}\``;
 }
 
+function canModerateTarget(moderatorMember, targetMember) {
+    if (!moderatorMember || !targetMember) return false;
+
+    if (moderatorMember.id === targetMember.id) return true;
+
+    if (moderatorMember.permissions.has(PermissionFlagsBits.Administrator)) {
+        return true;
+    }
+
+    return moderatorMember.roles.highest.position > targetMember.roles.highest.position;
+}
+
 function buildFilterSummary(filters) {
     const summary = [];
 
@@ -104,6 +116,23 @@ module.exports = {
             images: interaction.options.getBoolean('images') || false,
             contains: interaction.options.getString('contains')
         };
+
+        if (filters.user) {
+            const moderatorMember = interaction.member;
+            const targetMember = await interaction.guild.members.fetch(filters.user.id).catch(() => null);
+
+            if (!targetMember) {
+                return safeReply(interaction, {
+                    content: '❌ That user is not in this server.'
+                }, true);
+            }
+
+            if (!canModerateTarget(moderatorMember, targetMember)) {
+                return safeReply(interaction, {
+                    content: '❌ You cannot clear messages from someone with an equal or higher role than you.'
+                }, true);
+            }
+        }
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()

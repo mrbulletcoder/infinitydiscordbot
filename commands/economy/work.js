@@ -13,9 +13,21 @@ const jobs = [
     { name: 'Streamer', min: 250, max: 1500 }
 ];
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
     }
 
     return ctx.reply(options);
@@ -42,7 +54,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         return work(interaction);
     }
 };
@@ -58,7 +70,7 @@ async function work(ctx) {
     if (remaining > 0) {
         return respond(ctx, {
             content: `⏳ You are tired from working. Try again in **${formatTime(remaining)}**.`
-        });
+        }, true);
     }
 
     const job = jobs[Math.floor(Math.random() * jobs.length)];
@@ -75,8 +87,8 @@ async function work(ctx) {
             { name: '💰 Earned', value: formatMoney(amount), inline: true },
             { name: '⏳ Cooldown', value: '30 minutes', inline: true }
         )
-        .setFooter({ text: 'Infinity Economy System ⚡' })
+        .setFooter({ text: 'Infinity Economy System • Work ⚡' })
         .setTimestamp();
 
-    return respond(ctx, { embeds: [embed] });
+    return publicResult(ctx, { embeds: [embed] });
 }

@@ -185,60 +185,60 @@ module.exports = {
             .setColor('#00bfff')
             .setTitle('👤 Infinity User Profile')
             .setDescription(
-                `A premium identity overview for **${fetchedUser.username}**.\n` +
-                'View account age, server presence, permissions, moderation data, and role intelligence.'
+                `A clean user overview for **${fetchedUser.username}**.`
             )
             .setThumbnail(fetchedUser.displayAvatarURL({ dynamic: true, size: 1024 }))
             .addFields(
                 {
-                    name: '🪪 Identity Overview',
+                    name: '🪪 Identity',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Tag:** ${fetchedUser.tag}\n` +
-                        `**User ID:** \`${fetchedUser.id}\`\n` +
-                        `**Bot Account:** \`${fetchedUser.bot ? 'Yes' : 'No'}\`\n` +
-                        `**Status:** ${getStatusText(status)}`
+                        `Tag: ${fetchedUser.tag}\n` +
+                        `User ID: ${fetchedUser.id}\n` +
+                        `Bot Account: ${fetchedUser.bot ? 'Yes' : 'No'}\n` +
+                        `Status: ${getStatusText(status)}\n\u200b`,
+                    inline: false
                 },
+
                 {
-                    name: '📅 Account Created',
-                    value: '━━━━━━━━━━━━━━━━━━\n' + formatFullDate(fetchedUser.createdAt),
-                    inline: true
+                    name: '📅 Account Timeline',
+                    value:
+                        `Account Created: ${formatFullDate(fetchedUser.createdAt)}\n` +
+                        `Joined Server: ${member?.joinedAt ? formatFullDate(member.joinedAt) : 'Not available'}\n\u200b`,
+                    inline: false
                 },
-                {
-                    name: '📥 Joined Server',
-                    value: '━━━━━━━━━━━━━━━━━━\n' +
-                        (member?.joinedAt ? formatFullDate(member.joinedAt) : '`Not available`'),
-                    inline: true
-                },
+
                 {
                     name: '📈 Server Position',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Join Position:** ${joinPosition ? `\`#${joinPosition}\`` : '`Unknown`'}\n` +
-                        `**Top Role:** ${topRole}`,
-                    inline: true
+                        `Join Position: ${joinPosition ? `#${joinPosition}` : 'Unknown'}\n` +
+                        `Top Role: ${topRole}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '⚠️ Moderation Status',
                     value:
-                        '━━━━━━━━━━━━━━━━━━\n' +
-                        `**Warnings:** \`${warningCount}\`\n` +
-                        `**Timed Out:** \`${member?.isCommunicationDisabled() ? 'Yes' : 'No'}\``,
-                    inline: true
+                        `Warnings: ${warningCount}\n` +
+                        `Timed Out: ${member?.isCommunicationDisabled() ? 'Yes' : 'No'}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '🏅 Badges',
-                    value: '━━━━━━━━━━━━━━━━━━\n' + getBadges(fetchedUser, member, guild),
-                    inline: true
+                    value: `${getBadges(fetchedUser, member, guild)}\n\u200b`,
+                    inline: false
                 },
+
                 {
                     name: '🛡️ Key Permissions',
-                    value: '━━━━━━━━━━━━━━━━━━\n' + getKeyPermissions(member),
-                    inline: true
+                    value: `${getKeyPermissions(member)}\n\u200b`,
+                    inline: false
                 },
+
                 {
-                    name: '🎭 Role Collection',
-                    value: '━━━━━━━━━━━━━━━━━━\n' + getRoleDisplay(member)
+                    name: '🎭 Roles',
+                    value: getRoleDisplay(member),
+                    inline: false
                 }
             )
             .setFooter({ text: 'Infinity Bot • User Intelligence ⚡' })

@@ -25,7 +25,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const amount = interaction.options.getInteger('amount', true);
         const userId = interaction.user.id;
         const guildId = interaction.guild.id;
@@ -47,9 +47,9 @@ module.exports = {
             .setColor('#00ff99')
             .setTitle('💸 Withdrawal Successful')
             .setDescription(`Withdrew **${formatMoney(amount)}** from your bank.`)
-            .setFooter({ text: 'Infinity Economy System ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Withdraw ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

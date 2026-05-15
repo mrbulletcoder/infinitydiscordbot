@@ -81,96 +81,68 @@ function buildReportEmbed({
     decision = null,
     submittedAt = Date.now()
 }) {
-    const targetTag = target?.tag || 'Unknown User';
-    const targetId = target?.id || 'Unknown ID';
-    const reporterTag = reporter?.tag || 'Unknown User';
-    const reporterId = reporter?.id || 'Unknown ID';
+    const statusColor =
+        status === 'Resolved'
+            ? '#57f287'
+            : status === 'Dismissed'
+                ? '#ff4d4d'
+                : status === 'Claimed'
+                    ? '#ffaa00'
+                    : '#00bfff';
+
+    const submittedUnix = Math.floor(Number(submittedAt || Date.now()) / 1000);
 
     return new EmbedBuilder()
+        .setColor(statusColor)
         .setAuthor({
-            name: '🚨 Infinity Member Report',
+            name: 'Infinity • Member Report',
             iconURL: guild.iconURL({ dynamic: true }) || undefined
         })
-        .setColor(
-            status === 'Resolved'
-                ? '#00ff88'
-                : status === 'Dismissed'
-                    ? '#ff4d4d'
-                    : status === 'Claimed'
-                        ? '#ffaa00'
-                        : '#ff4d4d'
-        )
-        .setThumbnail(
-            target?.displayAvatarURL
-                ? target.displayAvatarURL({ dynamic: true, size: 1024 })
-                : null
-        )
+        .setTitle(`🚨 Report Case #${caseNumber}`)
         .setDescription(
             decision
-                ? `**Final Decision:** ${decision}`
-                : 'A member report has been submitted and is awaiting staff review.'
+                ? `**Final Decision:**\n> ${decision}`
+                : 'A member report has been submitted and is ready for staff review.'
         )
+        .setThumbnail(target?.displayAvatarURL?.({ dynamic: true, size: 256 }) || null)
         .addFields(
             {
-                name: '📌 Report Information',
+                name: '📌 Report Details',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `**Case:** \`#${caseNumber}\`\n` +
-                    `**Report ID:** \`${reportId}\`\n` +
-                    `**Status:** \`${status}\``,
-                inline: true
+                    `Report ID: \`${reportId}\`\n` +
+                    `Case: \`#${caseNumber}\`\n` +
+                    `Status: \`${status}\`\n` +
+                    `Submitted: <t:${submittedUnix}:R>`,
+                inline: false
             },
             {
-                name: '👤 Reported User',
+                name: '👤 Reported Member',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${targetTag}\n` +
-                    `\`${targetId}\``,
-                inline: true
+                    `${target ? target.tag : 'Unknown User'}\n` +
+                    `\`${target?.id || 'Unknown ID'}\``,
+                inline: false
             },
             {
                 name: '🧾 Reported By',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${reporterTag}\n` +
-                    `\`${reporterId}\``,
-                inline: true
-            },
-            {
-                name: '📄 Reason',
-                value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `${reason}`,
+                    `${reporter ? reporter.tag : 'Unknown User'}\n` +
+                    `\`${reporter?.id || 'Unknown ID'}\``,
                 inline: false
             },
             {
-                name: '📅 Submitted',
-                value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    `<t:${Math.floor(Number(submittedAt) / 1000)}:F>\n` +
-                    `<t:${Math.floor(Number(submittedAt) / 1000)}:R>`,
-                inline: true
+                name: '📄 Reason',
+                value: `> ${String(reason || 'No reason provided.').slice(0, 1000)}`,
+                inline: false
             },
             {
-                name: '🛄 Claimed By',
+                name: '📍 Staff Status',
                 value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    (claimedBy
-                        ? `${claimedBy.tag}\n\`${claimedBy.id}\``
-                        : '`Not claimed`'),
-                inline: true
-            },
-            {
-                name: '🛠️ Handled By',
-                value:
-                    '━━━━━━━━━━━━━━━━━━\n' +
-                    (handledBy
-                        ? `${handledBy.tag}\n\`${handledBy.id}\``
-                        : '`Not handled yet`'),
-                inline: true
+                    `Claimed By: ${claimedBy ? claimedBy.tag : '`Not claimed`'}\n` +
+                    `Handled By: ${handledBy ? handledBy.tag : '`Not handled yet`'}`,
+                inline: false
             }
         )
-        .setFooter({ text: 'Infinity Reports System' })
+        .setFooter({ text: 'Infinity Bot • Reports System ⚡' })
         .setTimestamp();
 }
 

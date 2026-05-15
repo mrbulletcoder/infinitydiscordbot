@@ -61,7 +61,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const guildId = interaction.guild.id;
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger('bet', true);
@@ -77,7 +77,7 @@ module.exports = {
 
         if (Number(user.wallet) < bet) {
             return safeReply(interaction, {
-                content: `❌ You do not have enough money in your wallet.\nWallet: ${formatMoney(user.wallet)}`
+                content: `❌ You do not have enough money.\nWallet: ${formatMoney(user.wallet)}`
             }, true);
         }
 
@@ -133,9 +133,9 @@ module.exports = {
                     'Any pair = `x2`',
                 inline: false
             })
-            .setFooter({ text: 'Infinity Casino • Gamble responsibly ⚡' })
+            .setFooter({ text: 'Infinity Casino • Slots ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

@@ -39,7 +39,7 @@ module.exports = {
     async executeSlash(interaction) {
         const deferred = await safeDefer(interaction, true);
         if (!deferred) return;
-        
+
         const guildId = interaction.guild.id;
         const robber = interaction.user;
         const target = interaction.options.getUser('user', true);
@@ -101,10 +101,14 @@ module.exports = {
                     { name: '🕵️ Robber', value: `${robber.tag}\n\`${robber.id}\``, inline: true },
                     { name: '🛡️ Protection', value: hasBankShield ? '`Bank Shield Active`' : '`None`', inline: true }
                 )
-                .setFooter({ text: 'Infinity Economy • Crime System ⚡' })
+                .setFooter({ text: 'Infinity Economy System • Rob ⚡' })
                 .setTimestamp();
 
-            return safeReply(interaction, { embeds: [embed] }, true);
+            await safeReply(interaction, {
+                content: '✅ Rob result posted.'
+            }, true);
+
+            return interaction.channel.send({ embeds: [embed] });
         }
 
         const fine = Math.min(
@@ -126,6 +130,6 @@ module.exports = {
             .setFooter({ text: 'Infinity Economy • Crime System ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return interaction.channel.send({ embeds: [embed] });
     }
 };

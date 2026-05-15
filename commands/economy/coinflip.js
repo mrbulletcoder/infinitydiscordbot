@@ -5,9 +5,21 @@ const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply'
 const MIN_BET = 100;
 const MAX_BET = 250000;
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
     }
 
     return ctx.reply(options);
@@ -86,19 +98,19 @@ async function runCoinflip(ctx, side, bet) {
         if (!side || !['heads', 'tails'].includes(side)) {
             return respond(ctx, {
                 content: '❌ Choose either **heads** or **tails**.'
-            });
+            }, true);
         }
 
         if (!Number.isInteger(bet) || bet < MIN_BET) {
             return respond(ctx, {
                 content: `❌ Minimum bet is **${formatMoney(MIN_BET)}**.`
-            });
+            }, true);
         }
 
         if (bet > MAX_BET) {
             return respond(ctx, {
                 content: `❌ Maximum bet is **${formatMoney(MAX_BET)}**.`
-            });
+            }, true);
         }
 
         const data = await getUser(guildId, userId);
@@ -106,8 +118,8 @@ async function runCoinflip(ctx, side, bet) {
 
         if (wallet < bet) {
             return respond(ctx, {
-                content: `❌ You do not have enough coins in your wallet.\nWallet: **${formatMoney(wallet)}**`
-            });
+                content: `❌ You do not have enough money.\nWallet: **${formatMoney(wallet)}**`
+            }, true);
         }
 
         const result = Math.random() < 0.5 ? 'heads' : 'tails';
@@ -126,27 +138,42 @@ async function runCoinflip(ctx, side, bet) {
                 iconURL: user.displayAvatarURL({ dynamic: true })
             })
             .setTitle(won ? '🪙 Coinflip Win!' : '🪙 Coinflip Lost')
-            .setDescription(
-                `The coin landed on **${result.toUpperCase()}**.\n` +
-                `You chose **${side.toUpperCase()}**.\n\n` +
+            .addFields(
+                {
+                    name: '🪙 Coin Result',
+                    value:
+                        `Coin Landed On: ${result.toUpperCase()}\n` +
+                        `Your Choice: ${side.toUpperCase()}\n\u200b`,
+                    inline: false
+                },
 
-                `╭─ **🪙 COINFLIP RESULT** ─╮\n` +
-                `│ 🎰 **Bet:** ${formatMoney(bet)}\n` +
-                `│ ${won ? '💰 **Profit:**' : '💸 **Lost:**'} ${formatMoney(bet)}\n` +
-                `│ 🎲 **Result:** ${won ? '✅ You won!' : '❌ You lost!'}\n` +
-                `│ 👛 **New Wallet:** ${formatMoney(won ? wallet + bet : wallet - bet)}\n` +
-                `╰────────────────────╯`
+                {
+                    name: '💰 Betting Information',
+                    value:
+                        `Bet Amount: ${formatMoney(bet)}\n` +
+                        `${won ? 'Profit' : 'Lost'}: ${formatMoney(bet)}\n` +
+                        `Result: ${won ? '✅ You won!' : '❌ You lost!'}\n` +
+                        `Wallet Balance: ${formatMoney(won ? wallet + bet : wallet - bet)}\n\u200b`,
+                    inline: false
+                }
             )
             .setFooter({ text: 'Infinity Casino • Coinflip ⚡' })
             .setTimestamp();
 
-        return respond(ctx, { embeds: [embed] });
+        if (ctx.user) {
+
+            return ctx.channel.send({
+                embeds: [embed]
+            });
+        }
+
+        return publicResult(ctx, { embeds: [embed] });
 
     } catch (error) {
         console.error('Coinflip command error:', error);
 
         return respond(ctx, {
             content: '❌ Something went wrong while flipping the coin.'
-        });
+        }, true);
     }
 }

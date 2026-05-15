@@ -3,9 +3,9 @@ const { pool } = require('../../database');
 const { formatMoney } = require('../../utils/economy');
 const { safeReply, safeDefer } = require('../../handlers/interactions/safeReply');
 
-function respond(ctx, options) {
+function respond(ctx, options, ephemeral = false) {
     if (ctx.user) {
-        return safeReply(ctx, options, true);
+        return safeReply(ctx, options, ephemeral);
     }
 
     return ctx.reply(options);
@@ -31,7 +31,7 @@ module.exports = {
     },
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
         
         return leaderboard(interaction);
@@ -53,7 +53,7 @@ async function leaderboard(ctx) {
     if (!rows.length) {
         return respond(ctx, {
             content: '❌ No economy data yet. Use `/daily` or `/work` to get started.'
-        });
+        }, true);
     }
 
     const lines = [];
@@ -68,7 +68,7 @@ async function leaderboard(ctx) {
         .setColor('#ffd700')
         .setTitle('🏆 Richest Members')
         .setDescription(lines.join('\n'))
-        .setFooter({ text: 'Infinity Economy Leaderboard ⚡' })
+        .setFooter({ text: 'Infinity Economy System • Leaderboard ⚡' })
         .setTimestamp();
 
     return respond(ctx, { embeds: [embed] });

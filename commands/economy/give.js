@@ -37,7 +37,7 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async executeSlash(interaction) {
-        const deferred = await safeDefer(interaction, true);
+        const deferred = await safeDefer(interaction, false);
         if (!deferred) return;
         
         const target = interaction.options.getUser('user', true);
@@ -69,9 +69,9 @@ module.exports = {
                     inline: true
                 }
             )
-            .setFooter({ text: 'Infinity Economy Admin ⚡' })
+            .setFooter({ text: 'Infinity Economy System • Give ⚡' })
             .setTimestamp();
 
-        return safeReply(interaction, { embeds: [embed] }, true);
+        return safeReply(interaction, { embeds: [embed] }, false);
     }
 };

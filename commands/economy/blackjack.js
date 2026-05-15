@@ -4,7 +4,8 @@ const {
     PermissionFlagsBits,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    AttachmentBuilder
 } = require('discord.js');
 
 const {
@@ -20,13 +21,30 @@ const {
     safeDeferUpdate
 } = require('../../handlers/interactions/safeReply');
 
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+
 const MIN_BET = 100;
 const MAX_BET = 250000;
 
 const activeGames = new Map();
 
-function respond(ctx, options) {
-    if (ctx.user) return safeReply(ctx, options, true);
+function respond(ctx, options, ephemeral = false) {
+    if (ctx.user) {
+        return safeReply(ctx, options, ephemeral);
+    }
+
+    return ctx.reply(options);
+}
+
+async function publicResult(ctx, options) {
+    if (ctx.user) {
+        const sent = await ctx.channel.send(options);
+
+        await ctx.deleteReply().catch(() => null);
+
+        return sent;
+    }
+
     return ctx.reply(options);
 }
 
@@ -40,13 +58,62 @@ function drawCard() {
     };
 }
 
-function cardDisplay(card) {
-    return `${card.value}${card.suit}`;
+const CARD_EMOJIS = {
+    '♠️': {
+        A: '🂡', 2: '🂢', 3: '🂣', 4: '🂤', 5: '🂥', 6: '🂦', 7: '🂧',
+        8: '🂨', 9: '🂩', 10: '🂪', J: '🂫', Q: '🂭', K: '🂮'
+    },
+    '♥️': {
+        A: '🂱', 2: '🂲', 3: '🂳', 4: '🂴', 5: '🂵', 6: '🂶', 7: '🂷',
+        8: '🂸', 9: '🂹', 10: '🂺', J: '🂻', Q: '🂽', K: '🂾'
+    },
+    '♦️': {
+        A: '🃁', 2: '🃂', 3: '🃃', 4: '🃄', 5: '🃅', 6: '🃆', 7: '🃇',
+        8: '🃈', 9: '🃉', 10: '🃊', J: '🃋', Q: '🃍', K: '🃎'
+    },
+    '♣️': {
+        A: '🃑', 2: '🃒', 3: '🃓', 4: '🃔', 5: '🃕', 6: '🃖', 7: '🃗',
+        8: '🃘', 9: '🃙', 10: '🃚', J: '🃛', Q: '🃝', K: '🃞'
+    }
+};
+
+function getCardCode(card) {
+    const valueMap = {
+        A: 'A',
+        J: 'J',
+        Q: 'Q',
+        K: 'K',
+        10: '0'
+    };
+
+    const suitMap = {
+        '♠️': 'S',
+        '♥️': 'H',
+        '♦️': 'D',
+        '♣️': 'C'
+    };
+
+    const value = valueMap[card.value] || card.value;
+    const suit = suitMap[card.suit];
+
+    return `${value}${suit}`;
 }
 
-function handDisplay(hand, hideFirst = false) {
-    if (hideFirst) {
-        return `🂠 ${hand.slice(1).map(cardDisplay).join(' ')}`;
+function getCardImageUrl(card) {
+    return `https://deckofcardsapi.com/static/img/${getCardCode(card)}.png`;
+}
+
+function getCardBackUrl() {
+    return 'https://deckofcardsapi.com/static/img/back.png';
+}
+
+function cardDisplay(card) {
+    return CARD_EMOJIS[card.suit]?.[card.value] || `${card.value}${card.suit}`;
+}
+
+function handDisplay(hand, hideSecond = false) {
+    if (hideSecond) {
+        return `${cardDisplay(hand[0])} 🂠`;
     }
 
     return hand.map(cardDisplay).join(' ');
@@ -73,6 +140,45 @@ function handValue(hand) {
     }
 
     return total;
+}
+
+async function buildBlackjackImage(playerHand, dealerHand, hideDealer = true) {
+    const canvas = createCanvas(700, 470);
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Arial';
+
+    const playerValue = handValue(playerHand);
+    const dealerValue = hideDealer ? '?' : handValue(dealerHand);
+
+    ctx.fillText(`Your Hand - Value: ${playerValue}`, 40, 45);
+    ctx.fillText(`Dealer Hand - Value: ${dealerValue}`, 40, 255);
+
+    const cardWidth = 100;
+    const cardHeight = 140;
+    const gap = 18;
+
+    for (let i = 0; i < playerHand.length; i++) {
+        const img = await loadImage(getCardImageUrl(playerHand[i]));
+        ctx.drawImage(img, 40 + i * (cardWidth + gap), 70, cardWidth, cardHeight);
+    }
+
+    for (let i = 0; i < dealerHand.length; i++) {
+        const imageUrl = hideDealer && i === 1
+            ? getCardBackUrl()
+            : getCardImageUrl(dealerHand[i]);
+
+        const img = await loadImage(imageUrl);
+        ctx.drawImage(img, 40 + i * (cardWidth + gap), 280, cardWidth, cardHeight);
+    }
+
+    return new AttachmentBuilder(await canvas.encode('png'), {
+        name: 'blackjack-table.png'
+    });
 }
 
 function isBlackjack(hand) {
@@ -115,36 +221,40 @@ function buildGameEmbed({
 
     const color =
         status === 'win' ? '#00ff99' :
-        status === 'lose' ? '#ff4d4d' :
-        status === 'push' ? '#ffaa00' :
-        '#5865f2';
+            status === 'lose' ? '#ff4d4d' :
+                status === 'push' ? '#ffaa00' :
+                    '#5865f2';
 
     const title =
         status === 'win' ? '🃏 Blackjack Win!' :
-        status === 'lose' ? '💥 Blackjack Lost' :
-        status === 'push' ? '🤝 Blackjack Push' :
-        '🃏 Blackjack';
+            status === 'lose' ? '💥 Blackjack Lost' :
+                status === 'push' ? '🤝 Blackjack Push' :
+                    '🃏 Blackjack';
 
     return new EmbedBuilder()
         .setColor(color)
         .setAuthor({
-            name: `${user.username}'s Blackjack`,
+            name: user.username,
             iconURL: user.displayAvatarURL({ dynamic: true })
         })
-        .setTitle(title)
-        .setDescription(
-            `${resultText ? `# ${resultText}\n\n` : ''}` +
-
-            `╭─ **🃏 BLACKJACK TABLE** ─╮\n` +
-            `│ 🎰 **Bet:** ${formatMoney(bet)}\n` +
-            `│ 🧑 **Your Hand:** ${handDisplay(playerHand)}\n` +
-            `│ 🔢 **Your Total:** ${playerValue}\n` +
-            `│ 🤖 **Dealer Hand:** ${handDisplay(dealerHand, hideDealer)}\n` +
-            `│ 🔢 **Dealer Total:** ${dealerValue}\n` +
-            `${status !== 'playing' ? `│ ${profit >= 0 ? '💰 **Profit:**' : '💸 **Lost:**'} ${formatMoney(Math.abs(profit))}\n` : ''}` +
-            `│ 👛 **Wallet:** ${formatMoney(wallet)}\n` +
-            `╰──────────────────────╯`
+        .addFields(
+            {
+                name: 'Bet',
+                value: `${formatMoney(bet)}`,
+                inline: true
+            },
+            {
+                name: 'Wallet',
+                value: `${formatMoney(wallet)}`,
+                inline: true
+            },
+            {
+                name: 'Status',
+                value: resultText || 'Choose **Hit** or **Stand**.',
+                inline: false
+            }
         )
+        .setImage('attachment://blackjack-table.png')
         .setFooter({ text: 'Infinity Casino • Blackjack ⚡' })
         .setTimestamp();
 }
@@ -202,13 +312,13 @@ async function startBlackjack(ctx, bet) {
         if (bet < MIN_BET) {
             return respond(ctx, {
                 content: `❌ Minimum bet is **${formatMoney(MIN_BET)}**.`
-            });
+            }, true);
         }
 
         if (bet > MAX_BET) {
             return respond(ctx, {
                 content: `❌ Maximum bet is **${formatMoney(MAX_BET)}**.`
-            });
+            }, true);
         }
 
         const data = await getUser(guildId, userId);
@@ -216,8 +326,8 @@ async function startBlackjack(ctx, bet) {
 
         if (wallet < bet) {
             return respond(ctx, {
-                content: `❌ You only have **${formatMoney(wallet)}** in your wallet.`
-            });
+                content: `❌ You do not have enough money.\nWallet: **${formatMoney(wallet)}**`
+            }, true);
         }
 
         const existingGame = [...activeGames.values()].find(game =>
@@ -229,7 +339,7 @@ async function startBlackjack(ctx, bet) {
         if (existingGame) {
             return respond(ctx, {
                 content: '❌ You already have an active blackjack game.'
-            });
+            }, true);
         }
 
         await removeWallet(
@@ -283,8 +393,15 @@ async function startBlackjack(ctx, bet) {
                 hideDealer: false
             });
 
-            return respond(ctx, {
+            const image = await buildBlackjackImage(
+                game.playerHand,
+                game.dealerHand,
+                false
+            );
+
+            return publicResult(ctx, {
                 embeds: [embed],
+                files: [image],
                 components: buildButtons(gameId, true)
             });
         }
@@ -299,8 +416,15 @@ async function startBlackjack(ctx, bet) {
             hideDealer: true
         });
 
-        return respond(ctx, {
+        const image = await buildBlackjackImage(
+            game.playerHand,
+            game.dealerHand,
+            true
+        );
+
+        return publicResult(ctx, {
             embeds: [embed],
+            files: [image],
             components: buildButtons(gameId)
         });
 
@@ -309,7 +433,7 @@ async function startBlackjack(ctx, bet) {
 
         return respond(ctx, {
             content: '❌ Failed to start blackjack.'
-        });
+        }, true);
     }
 }
 
@@ -361,8 +485,15 @@ async function handleBlackjackButton(interaction) {
                 hideDealer: false
             });
 
+            const image = await buildBlackjackImage(
+                game.playerHand,
+                game.dealerHand,
+                false
+            );
+
             return safeReply(interaction, {
                 embeds: [embed],
+                files: [image],
                 components: buildButtons(gameId, true)
             });
         }
@@ -377,8 +508,15 @@ async function handleBlackjackButton(interaction) {
             hideDealer: true
         });
 
+        const image = await buildBlackjackImage(
+            game.playerHand,
+            game.dealerHand,
+            true
+        );
+
         return safeReply(interaction, {
             embeds: [embed],
+            files: [image],
             components: buildButtons(gameId)
         });
     }
@@ -440,8 +578,15 @@ async function handleBlackjackButton(interaction) {
             hideDealer: false
         });
 
+        const image = await buildBlackjackImage(
+            game.playerHand,
+            game.dealerHand,
+            false
+        );
+
         return safeReply(interaction, {
             embeds: [embed],
+            files: [image],
             components: buildButtons(gameId, true)
         });
     }
